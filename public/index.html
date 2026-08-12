@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mist AP Status</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <img src="/logo.png" alt="Vision Net" class="logo">
+    <div class="topbar-right">
+      <span id="updated-at" class="updated-at"></span>
+      <a href="/history.html" class="link-btn">History</a>
+      <button id="logout-btn" class="link-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="counts">
+      <button id="online-card" class="count-card online" type="button">
+        <span class="count-number" id="online-count">–</span>
+        <span class="count-label">Online</span>
+      </button>
+      <button id="offline-card" class="count-card offline" type="button">
+        <span class="count-number" id="offline-count">–</span>
+        <span class="count-label">Offline</span>
+      </button>
+    </section>
+
+    <section class="ap-panel">
+      <h2>Sites</h2>
+      <div id="site-map"></div>
+    </section>
+
+    <section id="offline-panel" class="ap-panel" hidden>
+      <h2>Offline access points</h2>
+      <ul id="offline-list" class="ap-list"></ul>
+    </section>
+
+    <section id="online-panel" class="ap-panel" hidden>
+      <h2>Online access points</h2>
+      <ul id="online-list" class="ap-list"></ul>
+    </section>
+
+    <p id="error-banner" class="error" hidden></p>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/app.js"></script>
+</body>
+</html>
