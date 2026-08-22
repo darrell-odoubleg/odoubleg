@@ -199,6 +199,21 @@ main.wide { max-width: 960px; }
   padding: 0.75rem 1rem;
 }
 
+.disclaimer {
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.3));
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  text-align: center;
+}
+
+.login-body .disclaimer {
+  width: 100%;
+  max-width: 320px;
+}
+
 .history-filter {
   width: 100%;
   max-width: 320px;
