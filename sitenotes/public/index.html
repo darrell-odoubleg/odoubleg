@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Site Notes</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">O Double G Site Notes</span>
+    <div class="topbar-right">
+      <button id="logout-btn" class="link-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="ap-panel">
+      <label for="location-select" class="field-label">Site</label>
+      <select id="location-select" class="location-select"></select>
+    </section>
+
+    <section class="ap-panel">
+      <h2>Add a note</h2>
+      <form id="note-form" class="note-form">
+        <input type="text" id="author-input" placeholder="Your name (optional)" autocomplete="name">
+        <textarea id="body-input" placeholder="What's needed or missing?" required rows="3"></textarea>
+        <button type="submit">Save note</button>
+      </form>
+      <p id="form-error" class="error" hidden></p>
+    </section>
+
+    <section class="ap-panel">
+      <h2>Notes</h2>
+      <ul id="notes-list" class="notes-list"></ul>
+      <p id="empty-msg" class="muted" hidden>No notes yet for this site.</p>
+    </section>
+
+    <p id="error-banner" class="error" hidden></p>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

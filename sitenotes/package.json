@@ -1,0 +1,19 @@
+{
+  "name": "sitenotes-odoubleg",
+  "version": "1.0.0",
+  "description": "O Double G site notes - needed/missing items log per fairgrounds location",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.19.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

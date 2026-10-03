@@ -1,0 +1,195 @@
+:root {
+  --color-primary: #2e479e;
+  --color-secondary: #132256;
+  --color-accent: #fba819;
+  --bg: #f4f4f4;
+  --panel: #ffffff;
+  --border: #e0e0e0;
+  --text: #212121;
+  --muted: #6b6f76;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--text);
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.5rem;
+  background: var(--color-secondary);
+}
+
+.brand { color: #fff; font-weight: 600; }
+
+.topbar-right { display: flex; align-items: center; gap: 1rem; }
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #b8bcc4;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-decoration: underline;
+}
+
+.link-btn:hover { color: #ffffff; }
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.muted { color: var(--muted); font-size: 0.9rem; }
+
+.ap-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.ap-panel h2 { font-size: 1rem; margin: 0 0 0.75rem; color: var(--muted); }
+
+.field-label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.location-select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.location-select:focus { outline: none; border-color: var(--color-primary); }
+
+.note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.note-form input,
+.note-form textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  font-size: 1rem;
+  color: var(--text);
+  font-family: inherit;
+  resize: vertical;
+}
+
+.note-form input:focus,
+.note-form textarea:focus { outline: none; border-color: var(--color-primary); }
+
+.note-form button {
+  align-self: flex-start;
+  background: var(--color-primary);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.note-form button:hover { background: var(--color-accent); }
+
+.note-form button:disabled { opacity: 0.6; cursor: default; }
+
+.notes-list { list-style: none; margin: 0; padding: 0; }
+
+.note-row {
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 0;
+}
+
+.note-row:first-child { border-top: none; }
+
+.note-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+}
+
+.note-body { white-space: pre-wrap; font-size: 0.95rem; }
+
+.error {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #dc2626;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.login-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--color-secondary);
+}
+
+.login-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-card h1 { font-size: 1.1rem; margin: 0 0 0.5rem; text-align: center; color: var(--text); }
+
+.login-card label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; color: var(--muted); }
+
+.login-card input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.login-card input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.login-card button {
+  background: var(--color-primary);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  padding: 0.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-card button:hover { background: var(--color-accent); }
