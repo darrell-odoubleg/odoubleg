@@ -1,0 +1,88 @@
+:root {
+  --navy: #101820;
+  --gold: #c9a04d;
+  --cream: #f7f3ec;
+  --gray: #6b7280;
+  --green: #2e7d4f;
+  --red: #b3382c;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--cream);
+  color: var(--navy);
+  margin: 0;
+}
+header {
+  background: var(--navy);
+  color: white;
+  padding: 1.25rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+header h1 { margin: 0; font-size: 1.4rem; letter-spacing: 0.5px; }
+header a, header button {
+  color: var(--gold);
+  text-decoration: none;
+  background: none;
+  border: 1px solid var(--gold);
+  padding: 0.4rem 0.9rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+main { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  border-left: 4px solid var(--gold);
+}
+.card h3 { margin: 0 0 0.4rem; color: var(--navy); }
+.meta { color: var(--gray); font-size: 0.9rem; margin-bottom: 0.5rem; }
+.roles { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; }
+.role-tag {
+  background: var(--cream);
+  border: 1px solid var(--gold);
+  border-radius: 20px;
+  padding: 0.2rem 0.8rem;
+  font-size: 0.85rem;
+}
+button.primary {
+  background: var(--navy);
+  color: white;
+  border: none;
+  padding: 0.55rem 1.2rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+button.primary:hover { background: #1c2b3a; }
+form label { display: block; margin: 0.7rem 0 0.25rem; font-weight: 600; font-size: 0.9rem; }
+form input, form select, form textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.95rem;
+}
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.status-applied { background: #fef3c7; color: #92400e; }
+.status-confirmed { background: #d1fae5; color: var(--green); }
+.status-declined { background: #fee2e2; color: var(--red); }
+.status-withdrawn { background: #e5e7eb; color: var(--gray); }
+table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
+th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb; font-size: 0.9rem; }
+.error { color: var(--red); font-size: 0.9rem; margin-top: 0.5rem; }
+.tabs { display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e5e7eb; }
+.tabs button { border: none; background: none; padding: 0.6rem 0; font-size: 1rem; cursor: pointer; color: var(--gray); }
+.tabs button.active { color: var(--navy); border-bottom: 3px solid var(--gold); font-weight: 600; }

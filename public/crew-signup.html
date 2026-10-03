@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Join Crew | O Double G Events</title><link rel="stylesheet" href="/css/style.css"></head>
+<body>
+<header><h1>O DOUBLE G &mdash; EVENTS</h1><a href="/">Back</a></header>
+<main>
+  <div class="card">
+    <h2>Join the Crew</h2>
+    <form id="signupForm">
+      <label>First Name *</label><input name="first_name" required>
+      <label>Last Name *</label><input name="last_name" required>
+      <label>Email *</label><input type="email" name="email" required>
+      <label>Password *</label><input type="password" name="password" required>
+      <label>Phone</label><input name="phone">
+      <label>City</label><input name="city">
+      <label>State</label><input name="state">
+      <label>Skills (comma-separated, e.g. audio, lighting, stagehand)</label><input name="skills">
+      <label>Certifications</label><input name="certifications">
+      <label>Hourly Rate ($)</label><input type="number" name="hourly_rate" step="0.01">
+      <label>Bio</label><textarea name="bio" rows="3"></textarea>
+      <br><br>
+      <button class="primary" type="submit">Sign Up</button>
+      <p id="msg" class="error"></p>
+    </form>
+  </div>
+</main>
+<script>
+document.getElementById('signupForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  const res = await fetch('/api/auth/crew/signup', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (res.ok) { location.href = '/crew-dashboard.html'; }
+  else { document.getElementById('msg').textContent = data.error || 'Signup failed'; }
+});
+</script>
+</body>
+</html>

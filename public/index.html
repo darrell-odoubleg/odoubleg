@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O Double G Events | Crew Opportunities</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header>
+  <h1>O DOUBLE G &mdash; EVENTS</h1>
+  <div id="authArea">
+    <a href="/crew-login.html">Crew Login</a>
+    <a href="/crew-signup.html">Join Crew</a>
+    <a href="/admin-login.html" style="opacity:0.6;">Admin</a>
+  </div>
+</header>
+<main>
+  <h2>Open Gigs</h2>
+  <p class="meta">Browse upcoming event staffing opportunities. Log in as crew to apply.</p>
+  <div id="gigList"><p>Loading gigs...</p></div>
+</main>
+<script>
+async function loadGigs() {
+  const res = await fetch('/api/gigs');
+  const gigs = await res.json();
+  const el = document.getElementById('gigList');
+  if (!gigs.length) { el.innerHTML = '<p>No open gigs right now. Check back soon.</p>'; return; }
+  el.innerHTML = gigs.map(g => `
+    <div class="card">
+      <h3>${escapeHtml(g.title)}</h3>
+      <div class="meta">${g.event_date} ${g.call_time ? '&middot; Call time ' + g.call_time : ''} ${g.venue ? '&middot; ' + escapeHtml(g.venue) : ''} ${g.city ? ', ' + escapeHtml(g.city) : ''}</div>
+      <p>${escapeHtml(g.description || '')}</p>
+      <div class="roles">
+        ${g.roles_needed.map(r => `<span class="role-tag">${escapeHtml(r.role)} &times; ${r.count}${r.pay_rate ? ' &mdash; $' + r.pay_rate + '/hr' : ''}</span>`).join('')}
+      </div>
+      <a href="/gig.html?id=${g.id}"><button class="primary">View & Apply</button></a>
+    </div>
+  `).join('');
+}
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+loadGigs();
+</script>
+</body>
+</html>

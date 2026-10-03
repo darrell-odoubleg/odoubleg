@@ -1,0 +1,9 @@
+node_modules/
+.env
+db/*.db
+db/*.db-shm
+db/*.db-wal
+*.log
+# curl cookie jars from manual testing (session cookies)
+*cookies*.txt
+*_c.txt

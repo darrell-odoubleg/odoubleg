@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard | O Double G Events</title><link rel="stylesheet" href="/css/style.css"></head>
+<body>
+<header>
+  <h1>O DOUBLE G &mdash; EVENTS ADMIN</h1>
+  <div><a href="/">Public Site</a> <button onclick="logout()">Log Out</button></div>
+</header>
+<main>
+  <div class="tabs">
+    <button class="active" data-tab="gigs" onclick="showTab('gigs')">Gigs</button>
+    <button data-tab="crew" onclick="showTab('crew')">Crew Directory</button>
+    <button data-tab="schedule" onclick="showTab('schedule')">Schedule</button>
+  </div>
+
+  <div id="tab-gigs">
+    <div class="card">
+      <h3>Post New Gig</h3>
+      <form id="gigForm">
+        <label>Title *</label><input name="title" required>
+        <label>Description</label><textarea name="description" rows="2"></textarea>
+        <label>Venue</label><input name="venue">
+        <label>City</label><input name="city">
+        <label>State</label><input name="state">
+        <label>Event Date *</label><input type="date" name="event_date" required>
+        <label>Call Time</label><input type="time" name="call_time">
+        <label>End Time</label><input type="time" name="end_time">
+        <label>Roles Needed * (format: role:count:rate, one per line, e.g. "stagehand:3:25")</label>
+        <textarea name="rolesRaw" rows="3" placeholder="stagehand:3:25&#10;audio:1:35"></textarea>
+        <br><br>
+        <button class="primary" type="submit">Post Gig</button>
+        <p id="gigMsg" class="error"></p>
+      </form>
+    </div>
+    <h3>All Gigs</h3>
+    <div id="gigsList">Loading...</div>
+  </div>
+
+  <div id="tab-crew" style="display:none;">
+    <div class="card">
+      <label>Filter by skill</label><input id="skillFilter" placeholder="e.g. audio">
+      <label>Filter by city</label><input id="cityFilter" placeholder="e.g. Great Falls">
+      <button class="primary" onclick="loadCrew()">Search</button>
+    </div>
+    <div id="crewList">Loading...</div>
+  </div>
+
+  <div id="tab-schedule" style="display:none;">
+    <div id="scheduleList">Loading...</div>
+  </div>
+</main>
+<script>
+async function checkAuth() {
+  const res = await fetch('/api/auth/me');
+  const me = await res.json();
+  if (me.role !== 'admin') location.href = '/admin-login.html';
+}
+
+function showTab(name) {
+  ['gigs','crew','schedule'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  if (name === 'crew') loadCrew();
+  if (name === 'schedule') loadSchedule();
+}
+
+document.getElementById('gigForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  const roles_needed = body.rolesRaw.split('\n').filter(Boolean).map(line => {
+    const [role, count, pay_rate] = line.split(':').map(s => s.trim());
+    return { role, count: Number(count) || 1, pay_rate: pay_rate ? Number(pay_rate) : null };
+  });
+  delete body.rolesRaw;
+  body.roles_needed = roles_needed;
+  const res = await fetch('/api/gigs', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (res.ok) { e.target.reset(); loadGigs(); }
+  else { document.getElementById('gigMsg').textContent = data.error || 'Failed to post gig'; }
+});
+
+async function loadGigs() {
+  const res = await fetch('/api/gigs/admin/all');
+  const gigs = await res.json();
+  const el = document.getElementById('gigsList');
+  if (!gigs.length) { el.innerHTML = '<p class="meta">No gigs yet.</p>'; return; }
+  el.innerHTML = (await Promise.all(gigs.map(async g => {
+    const detailRes = await fetch('/api/gigs/' + g.id);
+    const detail = await detailRes.json();
+    return `
+    <div class="card">
+      <h3>${escapeHtml(g.title)} <span class="status-badge status-${g.status === 'open' ? 'confirmed' : 'withdrawn'}">${g.status}</span></h3>
+      <div class="meta">${g.event_date} ${g.venue ? '&middot; ' + escapeHtml(g.venue) : ''}</div>
+      <div class="roles">${g.roles_needed.map(r => `<span class="role-tag">${escapeHtml(r.role)} &times; ${r.count}</span>`).join('')}</div>
+      <h4>Applications (${detail.applications.length})</h4>
+      ${detail.applications.length ? `<table><tr><th>Crew</th><th>Role</th><th>Status</th><th>Action</th></tr>` +
+        detail.applications.map(a => `<tr>
+          <td>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</td>
+          <td>${escapeHtml(a.role_applied || '')}</td>
+          <td><span class="status-badge status-${a.status}">${a.status}</span></td>
+          <td>${a.status === 'applied' ? `
+            <button onclick="decide(${a.id},'confirmed')">Confirm</button>
+            <button onclick="decide(${a.id},'declined')">Decline</button>` : ''}</td>
+        </tr>`).join('') + `</table>` : '<p class="meta">No applications yet.</p>'}
+      <br><button onclick="closeGig(${g.id})">${g.status === 'open' ? 'Mark Filled' : 'Reopen'}</button>
+    </div>`;
+  }))).join('');
+}
+
+async function decide(appId, status) {
+  await fetch(`/api/applications/${appId}/decide`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ status })
+  });
+  loadGigs();
+}
+
+async function closeGig(id) {
+  const gigRes = await fetch('/api/gigs/' + id);
+  const gig = await gigRes.json();
+  const newStatus = gig.status === 'open' ? 'filled' : 'open';
+  await fetch('/api/gigs/' + id, {
+    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ status: newStatus })
+  });
+  loadGigs();
+}
+
+async function loadCrew() {
+  const skill = document.getElementById('skillFilter').value;
+  const city = document.getElementById('cityFilter').value;
+  const qs = new URLSearchParams();
+  if (skill) qs.set('skill', skill);
+  if (city) qs.set('city', city);
+  const res = await fetch('/api/crew?' + qs.toString());
+  const crew = await res.json();
+  const el = document.getElementById('crewList');
+  el.innerHTML = `<table><tr><th>Name</th><th>Skills</th><th>City</th><th>Phone</th><th>Rate</th></tr>` +
+    crew.map(c => `<tr>
+      <td>${escapeHtml(c.first_name)} ${escapeHtml(c.last_name)}</td>
+      <td>${escapeHtml(c.skills || '')}</td>
+      <td>${escapeHtml(c.city || '')}</td>
+      <td>${escapeHtml(c.phone || '')}</td>
+      <td>${c.hourly_rate ? '$' + c.hourly_rate + '/hr' : ''}</td>
+    </tr>`).join('') + `</table>`;
+}
+
+async function loadSchedule() {
+  const res = await fetch('/api/schedule');
+  const rows = await res.json();
+  const el = document.getElementById('scheduleList');
+  if (!rows.length) { el.innerHTML = '<p class="meta">No confirmed assignments yet.</p>'; return; }
+  el.innerHTML = `<table><tr><th>Date</th><th>Gig</th><th>Venue</th><th>Crew</th><th>Role</th><th>Phone</th></tr>` +
+    rows.map(r => `<tr>
+      <td>${r.event_date}</td><td>${escapeHtml(r.title)}</td><td>${escapeHtml(r.venue || '')}</td>
+      <td>${escapeHtml(r.first_name)} ${escapeHtml(r.last_name)}</td>
+      <td>${escapeHtml(r.role_applied || '')}</td><td>${escapeHtml(r.phone || '')}</td>
+    </tr>`).join('') + `</table>`;
+}
+
+async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); location.href = '/'; }
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+checkAuth().then(loadGigs);
+</script>
+</body>
+</html>
