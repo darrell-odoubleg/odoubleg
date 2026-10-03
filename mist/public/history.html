@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acknowledgment History — Mist AP Status</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <img src="/logo.png" alt="Vision Net" class="logo">
+    <div class="topbar-right">
+      <a href="/" class="link-btn">Back to dashboard</a>
+      <button id="logout-btn" class="link-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main class="wide">
+    <section class="ap-panel">
+      <h2>Acknowledgment history</h2>
+      <input id="history-filter" type="text" class="history-filter" placeholder="Filter by AP, org, site, or ticket…">
+      <div class="history-table-wrap">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Acknowledged</th>
+              <th>AP</th>
+              <th>Org</th>
+              <th>Site</th>
+              <th>Ticket</th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+      <p id="history-empty" class="muted" hidden>No acknowledgment history yet.</p>
+    </section>
+
+    <p id="error-banner" class="error" hidden></p>
+  </main>
+
+  <script src="/history.js"></script>
+<script src="https://franny.franromeoagency.com/widget.js" async></script>
+</body>
+</html>
