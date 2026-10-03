@@ -9,10 +9,11 @@ declare -A APPS=(
 )
 for prefix in "${!APPS[@]}"; do
   src=${APPS[$prefix]}
+  branch=$(git -C "$src" branch --show-current)
   if [ -d "$prefix" ]; then
-    git subtree pull --prefix="$prefix" "$src" master -m "Sync $prefix from $src"
+    git subtree pull --prefix="$prefix" "$src" "$branch" -m "Sync $prefix from $src"
   else
-    git subtree add --prefix="$prefix" "$src" master -m "Add $prefix from $src"
+    git subtree add --prefix="$prefix" "$src" "$branch" -m "Add $prefix from $src"
   fi
 done
 git push origin main
