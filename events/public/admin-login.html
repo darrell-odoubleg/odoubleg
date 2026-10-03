@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Login | O Double G Events</title><link rel="stylesheet" href="/css/style.css"></head>
+<body>
+<header><h1>O DOUBLE G &mdash; EVENTS</h1><a href="/">Back</a></header>
+<main>
+  <div class="card">
+    <h2>Admin Login</h2>
+    <form id="loginForm">
+      <label>Email</label><input type="email" name="email" required>
+      <label>Password</label><input type="password" name="password" required>
+      <br><br>
+      <button class="primary" type="submit">Log In</button>
+      <p id="msg" class="error"></p>
+    </form>
+  </div>
+</main>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  const res = await fetch('/api/auth/admin/login', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (res.ok) { location.href = '/admin-dashboard.html'; }
+  else { document.getElementById('msg').textContent = data.error || 'Login failed'; }
+});
+</script>
+</body>
+</html>

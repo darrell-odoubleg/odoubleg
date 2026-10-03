@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gig Details | O Double G Events</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header><h1>O DOUBLE G &mdash; EVENTS</h1><a href="/">Back to gigs</a></header>
+<main>
+  <div id="gigDetail" class="card">Loading...</div>
+  <div id="applyBox"></div>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const gigId = params.get('id');
+let currentUser = null;
+
+async function init() {
+  const meRes = await fetch('/api/auth/me');
+  const me = await meRes.json();
+  currentUser = me.role === 'crew' ? me.user : null;
+
+  const res = await fetch('/api/gigs/' + gigId);
+  if (!res.ok) { document.getElementById('gigDetail').innerHTML = '<p>Gig not found.</p>'; return; }
+  const g = await res.json();
+  document.getElementById('gigDetail').innerHTML = `
+    <h2>${escapeHtml(g.title)}</h2>
+    <div class="meta">${g.event_date} ${g.call_time ? '&middot; Call time ' + g.call_time : ''} ${g.venue ? '&middot; ' + escapeHtml(g.venue) : ''}</div>
+    <p>${escapeHtml(g.description || '')}</p>
+    <div class="roles">${g.roles_needed.map(r => `<span class="role-tag">${escapeHtml(r.role)} &times; ${r.count}${r.pay_rate ? ' &mdash; $' + r.pay_rate + '/hr' : ''}</span>`).join('')}</div>
+  `;
+
+  const applyBox = document.getElementById('applyBox');
+  if (!currentUser) {
+    applyBox.innerHTML = `<p class="meta"><a href="/crew-login.html">Log in</a> as crew to apply for this gig.</p>`;
+    return;
+  }
+  applyBox.innerHTML = `
+    <div class="card">
+      <h3>Apply</h3>
+      <label>Role</label>
+      <select id="roleSelect">${g.roles_needed.map(r => `<option value="${escapeHtml(r.role)}">${escapeHtml(r.role)}</option>`).join('')}</select>
+      <label>Notes (optional)</label>
+      <textarea id="notesInput" rows="3"></textarea>
+      <br><br>
+      <button class="primary" onclick="apply()">Submit Application</button>
+      <p id="applyMsg" class="error"></p>
+    </div>
+  `;
+}
+
+async function apply() {
+  const role_applied = document.getElementById('roleSelect').value;
+  const notes = document.getElementById('notesInput').value;
+  const res = await fetch('/api/applications', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ gig_id: Number(gigId), role_applied, notes })
+  });
+  const data = await res.json();
+  document.getElementById('applyMsg').textContent = res.ok ? 'Application submitted!' : (data.error || 'Failed to apply');
+  if (res.ok) document.getElementById('applyMsg').style.color = '#2e7d4f';
+}
+
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Crew Dashboard | O Double G Events</title><link rel="stylesheet" href="/css/style.css"></head>
+<body>
+<header>
+  <h1>O DOUBLE G &mdash; EVENTS</h1>
+  <div><a href="/">Gig Board</a> <button onclick="logout()">Log Out</button></div>
+</header>
+<main>
+  <div class="card">
+    <h2>Set Availability</h2>
+    <label>Date</label><input type="date" id="availDate">
+    <label>Status</label>
+    <select id="availStatus"><option value="available">Available</option><option value="unavailable">Unavailable</option></select>
+    <br><br>
+    <button class="primary" onclick="setAvailability()">Save</button>
+    <p id="availMsg" class="meta"></p>
+  </div>
+
+  <h2>My Applications</h2>
+  <div id="appsList"><p>Loading...</p></div>
+</main>
+<script>
+async function checkAuth() {
+  const res = await fetch('/api/auth/me');
+  const me = await res.json();
+  if (me.role !== 'crew') location.href = '/crew-login.html';
+}
+
+async function loadApps() {
+  const res = await fetch('/api/applications/mine');
+  const apps = await res.json();
+  const el = document.getElementById('appsList');
+  if (!apps.length) { el.innerHTML = '<p class="meta">No applications yet. Browse the <a href="/">gig board</a>.</p>'; return; }
+  el.innerHTML = `<table><tr><th>Gig</th><th>Date</th><th>Venue</th><th>Status</th><th></th></tr>` +
+    apps.map(a => `<tr>
+      <td>${escapeHtml(a.title)}</td>
+      <td>${a.event_date}</td>
+      <td>${escapeHtml(a.venue || '')}</td>
+      <td><span class="status-badge status-${a.status}">${a.status}</span></td>
+      <td>${a.status === 'applied' ? `<button onclick="withdraw(${a.id})">Withdraw</button>` : ''}</td>
+    </tr>`).join('') + `</table>`;
+}
+
+async function withdraw(id) {
+  await fetch(`/api/applications/${id}/withdraw`, { method: 'PUT' });
+  loadApps();
+}
+
+async function setAvailability() {
+  const date = document.getElementById('availDate').value;
+  const status = document.getElementById('availStatus').value;
+  if (!date) { document.getElementById('availMsg').textContent = 'Pick a date first.'; return; }
+  const res = await fetch('/api/crew/me/availability', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ date, status })
+  });
+  document.getElementById('availMsg').textContent = res.ok ? 'Saved.' : 'Failed to save.';
+}
+
+async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); location.href = '/'; }
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+checkAuth().then(loadApps);
+</script>
+</body>
+</html>
