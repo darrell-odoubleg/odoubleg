@@ -7,3 +7,6 @@ db/*.db-wal
 # curl cookie jars from manual testing (session cookies)
 *cookies*.txt
 *_c.txt
+
+# Scholarship uploads (personal documents)
+uploads/
