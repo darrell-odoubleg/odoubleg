@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scholarships | O Double G</title><link rel="stylesheet" href="/css/style.css">
+<style>
+  .hidden { display: none !important; }
+  textarea, input, select { font-family: inherit; }
+  #reviseText { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.95rem; }
+  header .who { color: #cbd5e1; font-size: 0.9rem; margin-right: 0.75rem; }
+  .bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
+  .bar select { width: auto; min-width: 200px; padding: 0.45rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.95rem; }
+  button.secondary { background: white; color: var(--navy); border: 1px solid #cbd5e1; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer; font-size: 0.9rem; }
+  button.secondary:hover { border-color: var(--navy); }
+  button.link { background: none; border: none; color: var(--red); cursor: pointer; font-size: 0.85rem; padding: 0; }
+  button:disabled { opacity: 0.55; cursor: default; }
+  .hint { color: var(--gray); font-size: 0.82rem; font-weight: 400; margin: 0 0 0.3rem; }
+  .ok { color: var(--green); font-size: 0.9rem; margin-left: 0.75rem; }
+  .save-row { position: sticky; bottom: 0; background: var(--cream); padding: 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; }
+  .essay-item { cursor: pointer; display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+  .essay-item:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
+  .badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+  .badge.writing { background: #fef3c7; color: #92400e; }
+  .badge.ready { background: #d1fae5; color: var(--green); }
+  .badge.error { background: #fee2e2; color: var(--red); }
+  .essay-text { width: 100%; min-height: 420px; font-family: Georgia, 'Times New Roman', serif; font-size: 1.02rem; line-height: 1.65; padding: 0.9rem; border: 1px solid #d1d5db; border-radius: 4px; }
+  .count { font-size: 0.85rem; color: var(--gray); }
+  .count.over { color: var(--red); font-weight: 600; }
+  .notes { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 0.75rem 1rem; font-size: 0.9rem; white-space: pre-wrap; margin: 0.75rem 0; }
+  .prompt-box { background: var(--cream); border-radius: 6px; padding: 0.75rem 1rem; white-space: pre-wrap; font-size: 0.92rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+  .chip { background: var(--cream); border: 1px solid var(--gold); border-radius: 16px; padding: 0.25rem 0.75rem; font-size: 0.82rem; cursor: pointer; }
+  .writing-msg { display: flex; align-items: center; gap: 0.6rem; padding: 2rem 0; color: var(--gray); }
+  .spinner { width: 18px; height: 18px; border: 3px solid #e5e7eb; border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .files li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid #e5e7eb; font-size: 0.92rem; }
+  .files ul { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+  .row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0 1rem; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; } main { padding: 0 1rem; } header { padding: 1rem; } header h1 { font-size: 1.1rem; } }
+  .versions { font-size: 0.85rem; color: var(--gray); margin-top: 0.5rem; }
+  .versions select { width: auto; padding: 0.3rem; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<header><h1>O DOUBLE G &mdash; SCHOLARSHIPS</h1><div><span class="who" id="who"></span><button id="logoutBtn" class="hidden">Log out</button></div></header>
+<main>
+
+  <div class="card hidden" id="loginCard" style="max-width:420px;margin:2rem auto;">
+    <h2 style="margin-top:0;">Log in</h2>
+    <form id="loginForm">
+      <label>Email</label><input type="email" name="email" required autocomplete="username">
+      <label>Password</label><input type="password" name="password" required autocomplete="current-password">
+      <br><br><button class="primary" type="submit">Log In</button>
+      <p id="loginMsg" class="error"></p>
+    </form>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="bar hidden" id="parentBar">
+      <label style="margin:0;font-weight:600;">Student</label>
+      <select id="studentSelect"></select>
+      <button class="secondary" id="addStudentBtn" type="button">+ Add student login</button>
+    </div>
+    <div class="card hidden" id="addStudentCard">
+      <h3>Add a student login</h3>
+      <form id="addStudentForm">
+        <div class="row">
+          <div><label>Name</label><input name="name" required></div>
+          <div><label>Email</label><input type="email" name="email" required></div>
+          <div><label>Password (8+ characters)</label><input name="password" required minlength="8"></div>
+        </div>
+        <br><button class="primary" type="submit">Create login</button>
+        <button class="secondary" type="button" id="cancelAddStudent">Cancel</button>
+        <p class="error" id="addStudentMsg"></p>
+      </form>
+    </div>
+
+    <div id="studentArea">
+      <div class="tabs">
+        <button data-tab="essays" class="active">Essays</button>
+        <button data-tab="profile">About Me</button>
+        <button data-tab="files">Documents</button>
+        <button data-tab="account">Account</button>
+      </div>
+
+      <!-- Essays -->
+      <section id="tab-essays">
+        <div id="essayList">
+          <div class="bar"><button class="primary" id="newEssayBtn" type="button">+ New essay</button></div>
+          <div class="card hidden" id="newEssayCard">
+            <h3>New scholarship essay</h3>
+            <p class="meta">The more you've filled in on About Me and Documents, the better the draft.</p>
+            <form id="newEssayForm">
+              <label>Scholarship name</label><input name="scholarship" required placeholder="e.g. Rotary Club Community Scholarship">
+              <label>Essay prompt</label><textarea name="prompt" rows="5" required placeholder="Paste the exact question or instructions"></textarea>
+              <div class="row">
+                <div><label>Focus (optional)</label><input name="angle" placeholder="e.g. write about the summer job at the fair"></div>
+                <div><label>Word limit</label><input name="word_limit" type="number" min="1" placeholder="e.g. 500"></div>
+                <div><label>Deadline</label><input name="deadline" type="date"></div>
+              </div>
+              <br><button class="primary" type="submit">Write it</button>
+              <button class="secondary" type="button" id="cancelNewEssay">Cancel</button>
+              <p class="error" id="newEssayMsg"></p>
+            </form>
+          </div>
+          <div id="essayItems"></div>
+        </div>
+
+        <div id="essayView" class="hidden">
+          <div class="bar"><button class="secondary" id="backToList" type="button">&larr; All essays</button></div>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:start;">
+              <div><h3 id="evTitle"></h3><div class="meta" id="evMeta"></div></div>
+              <button class="link" id="deleteEssay" type="button">Delete</button>
+            </div>
+            <details><summary class="meta" style="cursor:pointer;">Prompt &amp; details</summary>
+              <form id="detailsForm">
+                <label>Scholarship name</label><input name="scholarship" required>
+                <label>Essay prompt</label><textarea name="prompt" rows="5" required></textarea>
+                <div class="row">
+                  <div><label>Focus</label><input name="angle"></div>
+                  <div><label>Word limit</label><input name="word_limit" type="number" min="1"></div>
+                  <div><label>Deadline</label><input name="deadline" type="date"></div>
+                </div>
+                <br><button class="secondary" type="submit">Save details</button><span class="ok" id="detailsOk"></span>
+              </form>
+            </details>
+            <div class="prompt-box" id="evPrompt" style="margin-top:0.75rem;"></div>
+          </div>
+
+          <div class="card">
+            <div id="evWriting" class="writing-msg hidden"><div class="spinner"></div><span>Writing&hellip; this usually takes 1&ndash;2 minutes. You can leave this page and come back.</span></div>
+            <div id="evError" class="hidden"><p class="error" id="evErrorMsg"></p><button class="primary" id="retryBtn" type="button">Retry</button></div>
+            <div id="evDraft" class="hidden">
+              <div class="notes hidden" id="evNotes"></div>
+              <textarea class="essay-text" id="evText"></textarea>
+              <div class="bar" style="margin-top:0.5rem;">
+                <span class="count" id="evCount"></span><span style="flex:1"></span>
+                <button class="secondary" id="copyBtn" type="button">Copy</button>
+                <button class="primary" id="saveEditBtn" type="button" disabled>Save my edits</button>
+              </div>
+              <div class="versions" id="evVersions"></div>
+            </div>
+          </div>
+
+          <div class="card" id="reviseCard">
+            <h3>Ask for changes</h3>
+            <div class="chips" id="chips"></div>
+            <textarea id="reviseText" rows="3" placeholder="e.g. Use the story about coaching my little brother instead, and make the ending less formal."></textarea>
+            <br><br>
+            <button class="primary" id="reviseBtn" type="button">Revise</button>
+            <button class="secondary" id="freshBtn" type="button">Start over with a fresh draft</button>
+            <p class="error" id="reviseMsg"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- About me -->
+      <section id="tab-profile" class="hidden">
+        <div class="card">
+          <h3>About me</h3>
+          <p class="meta">Fill in what you can; it doesn't need to be polished. Specific details and real stories make the best essays. Nothing here gets made up; anything missing shows up as a [placeholder] for you to fill in.</p>
+          <form id="profileForm"></form>
+        </div>
+        <div class="save-row"><button class="primary" id="saveProfile" type="button">Save</button><span class="ok" id="profileOk"></span><span class="error" id="profileMsg"></span></div>
+      </section>
+
+      <!-- Documents -->
+      <section id="tab-files" class="hidden">
+        <div class="card">
+          <h3>Documents</h3>
+          <p class="meta">Upload anything that helps: resume, transcript, activity list, past essays, recommendation letters, award certificates. PDF, Word (.docx), text, or photos (JPG/PNG), up to 15 MB each.</p>
+          <form id="uploadForm">
+            <label>Files</label><input type="file" name="files" multiple required accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.webp,.gif">
+            <label>What is it? (optional)</label><input name="description" placeholder="e.g. junior year transcript">
+            <br><br><button class="primary" type="submit">Upload</button><span class="ok" id="uploadOk"></span>
+            <p class="error" id="uploadMsg"></p>
+          </form>
+          <div class="files"><ul id="fileList"></ul></div>
+        </div>
+      </section>
+
+      <!-- Account -->
+      <section id="tab-account" class="hidden">
+        <div class="card" style="max-width:420px;">
+          <h3>Change password</h3>
+          <form id="pwForm">
+            <label>Current password</label><input type="password" name="current" required autocomplete="current-password">
+            <label>New password (8+ characters)</label><input type="password" name="next" required minlength="8" autocomplete="new-password">
+            <br><br><button class="primary" type="submit">Change password</button><span class="ok" id="pwOk"></span>
+            <p class="error" id="pwMsg"></p>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const API = '/api/scholarships';
+let me = null, studentId = null, profileFields = [], profileDirty = false;
+let currentEssay = null, pollTimer = null, shownVersionId = null;
+
+const QUICK_CHANGES = ['Make it more personal', 'Sound more like me, less formal', 'Stronger opening', 'Cut it to fit the word limit', 'Use a different story', 'Tie it more to the scholarship'];
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
+function words(t) { return (String(t || '').match(/\S+/g) || []).length; }
+function fmtDate(d) { if (!d) return ''; const x = new Date(d.length <= 10 ? d + 'T12:00:00' : d.replace(' ', 'T') + 'Z'); return isNaN(x) ? d : x.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+function flash(id, text) { $(id).textContent = text; setTimeout(() => { $(id).textContent = ''; }, 2500); }
+
+async function api(path, opts = {}) {
+  const url = new URL(API + path, location.origin);
+  if (me && me.role === 'parent' && studentId) url.searchParams.set('studentId', studentId);
+  const init = { method: opts.method || 'GET', headers: {} };
+  if (opts.form) init.body = opts.form;
+  else if (opts.body) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body); }
+  const res = await fetch(url, init);
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && path !== '/login') { showLogin(); throw new Error('Please log in again.'); }
+  if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+  return data;
+}
+
+// ---- login ----
+function showLogin() {
+  me = null;
+  $('app').classList.add('hidden'); $('logoutBtn').classList.add('hidden'); $('who').textContent = '';
+  $('loginCard').classList.remove('hidden');
+}
+
+$('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('loginMsg').textContent = '';
+  try {
+    const { user } = await api('/login', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) });
+    e.target.reset();
+    start(user);
+  } catch (err) { $('loginMsg').textContent = err.message; }
+});
+
+$('logoutBtn').addEventListener('click', async () => { await fetch(API + '/logout', { method: 'POST' }); showLogin(); });
+
+async function start(user) {
+  me = user;
+  $('loginCard').classList.add('hidden'); $('app').classList.remove('hidden'); $('logoutBtn').classList.remove('hidden');
+  $('who').textContent = user.name;
+  profileFields = (await api('/profile-fields')).fields;
+  if (user.role === 'parent') {
+    $('parentBar').classList.remove('hidden');
+    await loadStudents();
+  } else {
+    studentId = user.id;
+    showStudent();
+  }
+}
+
+// ---- parent: students ----
+async function loadStudents(selectId) {
+  const { students } = await api('/students');
+  const sel = $('studentSelect');
+  sel.innerHTML = students.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  if (!students.length) {
+    studentId = null;
+    $('studentArea').classList.add('hidden');
+    $('addStudentCard').classList.remove('hidden');
+    return;
+  }
+  const remembered = Number(sessionStorageGet('scholarStudent'));
+  studentId = selectId || (students.some(s => s.id === remembered) ? remembered : students[0].id);
+  sel.value = studentId;
+  showStudent();
+}
+function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
+function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v); } catch {} }
+
+$('studentSelect').addEventListener('change', (e) => {
+  if (profileDirty && !confirm('You have unsaved About Me changes. Switch anyway?')) { e.target.value = studentId; return; }
+  studentId = Number(e.target.value); sessionStorageSet('scholarStudent', studentId); showStudent();
+});
+$('addStudentBtn').addEventListener('click', () => $('addStudentCard').classList.toggle('hidden'));
+$('cancelAddStudent').addEventListener('click', () => $('addStudentCard').classList.add('hidden'));
+$('addStudentForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('addStudentMsg').textContent = '';
+  try {
+    const { student } = await api('/students', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) });
+    e.target.reset(); $('addStudentCard').classList.add('hidden');
+    await loadStudents(student.id);
+  } catch (err) { $('addStudentMsg').textContent = err.message; }
+});
+
+function showStudent() {
+  $('studentArea').classList.remove('hidden');
+  profileDirty = false;
+  showEssayList();
+  loadProfile(); loadFiles();
+}
+
+// ---- tabs ----
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('active', x === b));
+  ['essays', 'profile', 'files', 'account'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== b.dataset.tab));
+}));
+
+// ---- about me ----
+async function loadProfile() {
+  const { data } = await api('/profile');
+  $('profileForm').innerHTML = profileFields.map(f => `
+    <label for="pf-${f.key}">${esc(f.label)}</label><p class="hint">${esc(f.hint)}</p>
+    <textarea id="pf-${f.key}" name="${f.key}" rows="${f.rows}">${esc(data[f.key] || '')}</textarea>`).join('');
+  profileDirty = false;
+}
+$('profileForm').addEventListener('input', () => { profileDirty = true; });
+$('saveProfile').addEventListener('click', async () => {
+  $('profileMsg').textContent = '';
+  try {
+    await api('/profile', { method: 'PUT', body: { data: Object.fromEntries(new FormData($('profileForm'))) } });
+    profileDirty = false; flash('profileOk', 'Saved');
+  } catch (err) { $('profileMsg').textContent = err.message; }
+});
+window.addEventListener('beforeunload', (e) => { if (profileDirty || !$('saveEditBtn').disabled) { e.preventDefault(); e.returnValue = ''; } });
+
+// ---- documents ----
+async function loadFiles() {
+  const { files } = await api('/files');
+  renderFiles(files);
+}
+function renderFiles(files) {
+  $('fileList').innerHTML = files.length ? files.map(f => `
+    <li><span><a href="${API}/files/${f.id}${me.role === 'parent' ? '?studentId=' + studentId : ''}">${esc(f.original_name)}</a>
+      ${f.description ? `<span class="meta"> &middot; ${esc(f.description)}</span>` : ''}
+      <span class="meta"> &middot; ${Math.max(1, Math.round(f.size / 1024))} KB</span></span>
+      <button class="link" data-del="${f.id}">Remove</button></li>`).join('')
+    : '<li class="meta">Nothing uploaded yet.</li>';
+}
+$('fileList').addEventListener('click', async (e) => {
+  const id = e.target.dataset.del;
+  if (!id || !confirm('Remove this file?')) return;
+  try { renderFiles((await api('/files/' + id, { method: 'DELETE' })).files); } catch (err) { alert(err.message); }
+});
+$('uploadForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('uploadMsg').textContent = '';
+  const btn = e.target.querySelector('button'); btn.disabled = true; btn.textContent = 'Uploading...';
+  try {
+    const form = new FormData(e.target);
+    if (me.role === 'parent') form.append('studentId', studentId);
+    renderFiles((await api('/files', { method: 'POST', form })).files);
+    e.target.reset(); flash('uploadOk', 'Uploaded');
+  } catch (err) { $('uploadMsg').textContent = err.message; }
+  finally { btn.disabled = false; btn.textContent = 'Upload'; }
+});
+
+// ---- essays: list ----
+async function showEssayList() {
+  clearTimeout(pollTimer); currentEssay = null;
+  $('essayView').classList.add('hidden'); $('essayList').classList.remove('hidden');
+  const { essays } = await api('/essays');
+  $('essayItems').innerHTML = essays.length ? essays.map(e => `
+    <div class="card essay-item" data-id="${e.id}">
+      <div><h3>${esc(e.scholarship)}</h3>
+        <div class="meta">${e.word_limit ? e.word_limit + ' words' : 'No word limit'}${e.deadline ? ' &middot; due ' + esc(fmtDate(e.deadline)) : ''} &middot; ${e.version_count} version${e.version_count === 1 ? '' : 's'}</div></div>
+      <span class="badge ${e.status}">${e.status === 'writing' ? 'Writing&hellip;' : e.status === 'error' ? 'Needs retry' : 'Draft ready'}</span>
+    </div>`).join('')
+    : '<p class="meta">No essays yet. Fill in About Me, then click "New essay".</p>';
+}
+$('essayItems').addEventListener('click', (e) => { const item = e.target.closest('[data-id]'); if (item) openEssay(Number(item.dataset.id)); });
+$('newEssayBtn').addEventListener('click', () => $('newEssayCard').classList.toggle('hidden'));
+$('cancelNewEssay').addEventListener('click', () => $('newEssayCard').classList.add('hidden'));
+$('newEssayForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('newEssayMsg').textContent = '';
+  try {
+    const body = Object.fromEntries(new FormData(e.target));
+    if (me.role === 'parent') body.studentId = studentId;
+    const { essay } = await api('/essays', { method: 'POST', body });
+    e.target.reset(); $('newEssayCard').classList.add('hidden');
+    openEssay(essay.id, essay);
+  } catch (err) { $('newEssayMsg').textContent = err.message; }
+});
+$('backToList').addEventListener('click', () => {
+  if (!$('saveEditBtn').disabled && !confirm('Discard your unsaved edits?')) return;
+  $('saveEditBtn').disabled = true;
+  showEssayList();
+});
+
+// ---- essays: one essay ----
+$('chips').innerHTML = QUICK_CHANGES.map(c => `<span class="chip">${esc(c)}</span>`).join('');
+$('chips').addEventListener('click', (e) => {
+  if (!e.target.classList.contains('chip')) return;
+  const t = $('reviseText'); t.value = t.value ? t.value.trim() + ' ' + e.target.textContent + '.' : e.target.textContent + '.'; t.focus();
+});
+
+async function openEssay(id, preloaded) {
+  clearTimeout(pollTimer);
+  $('essayList').classList.add('hidden'); $('essayView').classList.remove('hidden');
+  const essay = preloaded || (await api('/essays/' + id)).essay;
+  renderEssay(essay, true);
+}
+
+function renderEssay(e, fresh) {
+  const prevLatest = currentEssay && currentEssay.id === e.id && currentEssay.versions[0] ? currentEssay.versions[0].id : null;
+  currentEssay = e;
+  $('evTitle').textContent = e.scholarship;
+  $('evMeta').textContent = [e.word_limit ? `${e.word_limit}-word limit` : 'No word limit', e.deadline ? 'Due ' + fmtDate(e.deadline) : ''].filter(Boolean).join(' · ');
+  $('evPrompt').textContent = e.prompt + (e.angle ? `\n\nFocus: ${e.angle}` : '');
+  const f = $('detailsForm');
+  for (const k of ['scholarship', 'prompt', 'angle', 'word_limit', 'deadline']) f.elements[k].value = e[k] ?? '';
+
+  const writing = e.status === 'writing';
+  $('evWriting').classList.toggle('hidden', !writing);
+  $('evError').classList.toggle('hidden', e.status !== 'error');
+  $('evErrorMsg').textContent = e.error || '';
+  $('evDraft').classList.toggle('hidden', !e.versions.length || writing);
+  $('reviseCard').classList.toggle('hidden', writing);
+
+  const latest = e.versions[0];
+  if (latest && !writing && (fresh || latest.id !== prevLatest)) showVersion(latest.id);
+  if (writing) pollTimer = setTimeout(async () => {
+    try { const { essay } = await api('/essays/' + e.id); if (currentEssay && currentEssay.id === e.id) renderEssay(essay, false); } catch {}
+  }, 4000);
+}
+
+function showVersion(versionId) {
+  const v = currentEssay.versions.find(x => x.id === versionId);
+  shownVersionId = v.id;
+  $('evText').value = v.text;
+  $('evNotes').textContent = v.notes || '';
+  $('evNotes').classList.toggle('hidden', !v.notes);
+  $('saveEditBtn').disabled = true;
+  updateCount();
+  const label = (x, i) => `${currentEssay.versions.length - i}. ${x.source === 'edit' ? 'Your edit' : x.source === 'revision' ? 'Revision' : 'Draft'} · ${fmtDate(x.created_at)} · ${x.words} words`;
+  $('evVersions').innerHTML = currentEssay.versions.length > 1
+    ? `Version: <select id="versionSelect">${currentEssay.versions.map((x, i) => `<option value="${x.id}" ${x.id === v.id ? 'selected' : ''}>${esc(label(x, i))}</option>`).join('')}</select>
+       ${v.id !== currentEssay.versions[0].id ? ' <span>(older version: "Save my edits" makes it the latest again)</span>' : ''}`
+    : '';
+  const sel = $('versionSelect');
+  if (sel) sel.addEventListener('change', () => {
+    if (!$('saveEditBtn').disabled && !confirm('Discard your unsaved edits?')) { sel.value = shownVersionId; return; }
+    showVersion(Number(sel.value));
+    if (Number(sel.value) !== currentEssay.versions[0].id) $('saveEditBtn').disabled = false;
+  });
+}
+
+function updateCount() {
+  const n = words($('evText').value), lim = currentEssay && currentEssay.word_limit;
+  $('evCount').textContent = lim ? `${n} / ${lim} words` : `${n} words`;
+  $('evCount').classList.toggle('over', Boolean(lim && n > lim));
+}
+$('evText').addEventListener('input', () => { updateCount(); $('saveEditBtn').disabled = false; });
+
+$('saveEditBtn').addEventListener('click', async () => {
+  try {
+    const { essay } = await api(`/essays/${currentEssay.id}/edit`, { method: 'POST', body: { text: $('evText').value } });
+    renderEssay(essay, true);
+  } catch (err) { alert(err.message); }
+});
+$('copyBtn').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('evText').value); flash('evCount', 'Copied!'); setTimeout(updateCount, 2600); }
+  catch { $('evText').select(); document.execCommand('copy'); }
+});
+
+async function revise(body) {
+  $('reviseMsg').textContent = '';
+  if (!$('saveEditBtn').disabled && !confirm('You have unsaved edits, and they won\'t be included in the revision. Continue anyway?')) return;
+  try {
+    const { essay } = await api(`/essays/${currentEssay.id}/revise`, { method: 'POST', body });
+    $('reviseText').value = ''; $('saveEditBtn').disabled = true;
+    renderEssay(essay, false);
+  } catch (err) { $('reviseMsg').textContent = err.message; }
+}
+$('reviseBtn').addEventListener('click', () => {
+  const instruction = $('reviseText').value.trim();
+  if (!instruction) { $('reviseMsg').textContent = 'Say what to change, or tap one of the suggestions.'; return; }
+  revise({ instruction });
+});
+$('freshBtn').addEventListener('click', () => { if (confirm('Write a brand-new draft? The current versions stay in the history.')) revise({ fresh: true, instruction: $('reviseText').value.trim() }); });
+$('retryBtn').addEventListener('click', () => revise({ fresh: !currentEssay.versions.length, instruction: 'Rewrite it.' }));
+
+$('detailsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const { essay } = await api(`/essays/${currentEssay.id}`, { method: 'PUT', body: Object.fromEntries(new FormData(e.target)) });
+    currentEssay = { ...essay }; $('evTitle').textContent = essay.scholarship;
+    $('evPrompt').textContent = essay.prompt + (essay.angle ? `\n\nFocus: ${essay.angle}` : '');
+    updateCount(); flash('detailsOk', 'Saved. Click Revise or Start over to use the new details.');
+  } catch (err) { alert(err.message); }
+});
+$('deleteEssay').addEventListener('click', async () => {
+  if (!confirm(`Delete the ${currentEssay.scholarship} essay and all its versions?`)) return;
+  await api('/essays/' + currentEssay.id, { method: 'DELETE' });
+  $('saveEditBtn').disabled = true;
+  showEssayList();
+});
+
+// ---- account ----
+$('pwForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('pwMsg').textContent = '';
+  try { await api('/password', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) }); e.target.reset(); flash('pwOk', 'Password changed'); }
+  catch (err) { $('pwMsg').textContent = err.message; }
+});
+
+(async () => {
+  try { const { user } = await api('/me'); user ? start(user) : showLogin(); }
+  catch { showLogin(); }
+})();
+</script>
+</body>
+</html>
