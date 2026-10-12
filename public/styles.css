@@ -105,3 +105,7 @@ th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: upp
 @media (max-width: 600px) {
   .pick { grid-template-columns: 1fr; }
 }
+
+.gain { color: var(--buy); font-weight: 600; }
+.loss { color: var(--danger); font-weight: 600; }
+td.why-cell { white-space: normal; min-width: 260px; color: var(--muted); }

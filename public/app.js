@@ -8,8 +8,8 @@ const qty = (n) => (n == null ? '—' : Number(n).toLocaleString(undefined, { ma
 
 const BANNERS = {
   live: 'LIVE — the routine is placing real orders with real money.',
-  dry_run: 'Dry run — the routine researches and logs picks but places no orders. Budget below is paper money.',
-  paused: 'Paused — the routine still researches, but every purchase is refused.',
+  dry_run: 'Dry run — the routine researches and trades paper money only. Real positions it already bought are still protected.',
+  paused: 'Paused — no new buys. The routine still watches and sells open positions.',
 };
 
 async function api(path, opts) {
@@ -20,29 +20,47 @@ async function api(path, opts) {
   return data;
 }
 
-function renderState({ budget, holdings, orders }) {
+const PROTECTION = { broker_trailing: 'Robinhood trailing stop', broker_stop: 'Robinhood stop', hourly_check: 'Hourly check' };
+const REASONS = { stop_loss: 'Stop loss', take_profit: 'Take profit', signal: 'Signal' };
+const pnlCell = (n) => (n == null ? '—' : `<span class="${n >= 0 ? 'gain' : 'loss'}">${n >= 0 ? '+' : '−'}${money(Math.abs(n))}</span>`);
+
+function renderState({ budget, positions, sells, orders }) {
   $('mode-banner').className = 'banner ' + budget.mode;
   $('mode-banner').textContent = BANNERS[budget.mode];
   document.querySelectorAll('.modes button').forEach((b) => b.classList.toggle('active', b.dataset.mode === budget.mode));
 
-  $('s-total').textContent = money(budget.budget_total);
-  $('s-used-label').textContent = budget.mode === 'dry_run' ? 'Committed (paper)' : 'Committed';
-  $('s-used').textContent = money(budget.committed);
+  $('s-pot-label').textContent = budget.book === 'paper' ? 'Pot (paper)' : 'Pot';
+  $('s-pot').textContent = money(budget.pot);
+  $('s-used').textContent = money(budget.deployed);
   $('s-left').textContent = money(budget.remaining);
-  $('s-max').textContent = money(budget.max_order);
-  $('meter').style.width = Math.min(100, (budget.committed / (budget.budget_total || 1)) * 100) + '%';
+  $('s-pnl').innerHTML = pnlCell(budget.realized_pnl);
+  $('meter').style.width = Math.min(100, (budget.deployed / (budget.pot || 1)) * 100) + '%';
+  $('s-note').textContent = `Sells put money back in the pot. Max ${money(budget.max_order)} per buy; trailing stop ${budget.stop_loss_pct}%, take profit +${budget.take_profit_pct}%.`
+    + (budget.book === 'paper' && budget.live.deployed ? ` Real money invested: ${money(budget.live.deployed)}.` : '');
 
   const form = $('settings');
   if (document.activeElement.form !== form) {
     form.budget_total.value = budget.budget_total;
     form.max_order.value = budget.max_order;
+    form.stop_loss_pct.value = budget.stop_loss_pct;
+    form.take_profit_pct.value = budget.take_profit_pct;
   }
 
-  $('holdings').innerHTML = holdings.length ? holdings.map((h) => `
-    <tr><td><strong>${escapeHtml(h.symbol)}</strong></td><td>${escapeHtml(h.asset_type)}</td>
-    <td class="num">${money(h.invested)}</td><td class="num">${qty(h.qty)}</td>
-    <td class="num">${h.orders}</td><td>${escapeHtml(h.last_buy)}</td></tr>`).join('')
-    : '<tr><td colspan="6" class="empty">Nothing bought yet.</td></tr>';
+  $('positions').innerHTML = positions.length ? positions.map((p) => `
+    <tr><td><strong>${escapeHtml(p.symbol)}</strong>${p.paper ? ' <span class="tag dry_run">paper</span>' : ''}${p.sell_status === 'placed' ? ' <span class="tag placed">selling</span>' : ''}</td>
+    <td>${escapeHtml(p.asset_type)}</td><td class="num">${money(p.cost)}</td><td class="num">${qty(p.filled_qty)}</td>
+    <td class="num">${money(p.avg_price)}</td><td class="num">${money(p.high_water)}</td>
+    <td class="num">${money(p.stop_price)}</td><td class="num">${money(p.target_price)}</td>
+    <td>${escapeHtml(PROTECTION[p.protection] || 'Not set yet')}</td><td>${escapeHtml(p.created_at)}</td></tr>`).join('')
+    : '<tr><td colspan="10" class="empty">No open positions.</td></tr>';
+
+  $('sells').innerHTML = sells.length ? sells.map((x) => `
+    <tr><td>${escapeHtml(x.created_at)}</td><td><strong>${escapeHtml(x.symbol)}</strong>${x.paper ? ' <span class="tag dry_run">paper</span>' : ''}</td>
+    <td>${escapeHtml(REASONS[x.reason] || x.reason)}</td>
+    <td><span class="tag ${escapeHtml(x.status)}">${escapeHtml(x.status.replace('_', ' '))}</span></td>
+    <td class="num">${money(x.cost)}</td><td class="num">${money(x.proceeds)}</td><td class="num">${pnlCell(x.pnl)}</td>
+    <td class="why-cell">${escapeHtml(x.reasoning || x.error || '')}</td></tr>`).join('')
+    : '<tr><td colspan="8" class="empty">Nothing sold yet.</td></tr>';
 
   $('orders').innerHTML = orders.length ? orders.map((o) => `
     <tr><td class="num">${o.id}</td><td>${escapeHtml(o.created_at)}</td><td><strong>${escapeHtml(o.symbol)}</strong></td>
@@ -83,7 +101,7 @@ function saveSettings(body) {
 
 document.querySelectorAll('.modes button').forEach((b) => b.addEventListener('click', async () => {
   const mode = b.dataset.mode;
-  if (mode === 'live' && !confirm('Switch to LIVE? The routine will buy stocks and crypto with real money, without asking you, up to your spending cap.')) return;
+  if (mode === 'live' && !confirm('Switch to LIVE? The routine will buy and sell stocks and crypto with real money, without asking you, within your pot.')) return;
   try { await saveSettings({ mode }); await refresh(); } catch (e) { alert(e.message); }
 }));
 
@@ -91,7 +109,10 @@ $('settings').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
   try {
-    await saveSettings({ budget_total: f.budget_total.value, max_order: f.max_order.value });
+    await saveSettings({
+      budget_total: f.budget_total.value, max_order: f.max_order.value,
+      stop_loss_pct: f.stop_loss_pct.value, take_profit_pct: f.take_profit_pct.value,
+    });
     document.activeElement.blur();
     await refresh();
   } catch (err) { alert(err.message); }
