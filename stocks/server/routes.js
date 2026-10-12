@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const db = require('../db/init');
-const { MODES, NUMERIC, setSetting, budgetState, lots, reserve } = require('./budget');
+const { MODES, NUMERIC, FLAGS, setSetting, budgetState, lots, reserve } = require('./budget');
 
 const ASSET_TYPES = ['stock', 'crypto'];
 const PICK_ACTIONS = ['buy', 'watch', 'skip'];
@@ -125,7 +125,7 @@ agent.post('/orders/:id', (req, res) => {
 agent.post('/lots/:id', (req, res) => {
   const lot = db.prepare("SELECT * FROM orders WHERE id = ? AND status IN ('filled', 'dry_run')").get(req.params.id);
   if (!lot) return res.status(404).json({ error: 'No such lot' });
-  const { high_water, stop_order_id, protection } = req.body || {};
+  const { high_water, stop_order_id, protection, alert_stop_id, alert_target_id } = req.body || {};
   if (protection !== undefined && !PROTECTION.includes(protection)) {
     return res.status(400).json({ error: `protection must be one of ${PROTECTION.join(', ')}` });
   }
@@ -134,10 +134,15 @@ agent.post('/lots/:id', (req, res) => {
     UPDATE orders SET
       high_water = CASE WHEN ? > COALESCE(high_water, 0) THEN ? ELSE high_water END,
       stop_order_id = CASE WHEN ? THEN ? ELSE stop_order_id END,
-      protection = COALESCE(?, protection), updated_at = datetime('now')
+      protection = COALESCE(?, protection),
+      alert_stop_id = CASE WHEN ? THEN ? ELSE alert_stop_id END,
+      alert_target_id = CASE WHEN ? THEN ? ELSE alert_target_id END,
+      updated_at = datetime('now')
     WHERE id = ?
   `).run(Number.isFinite(hw) ? hw : 0, Number.isFinite(hw) ? hw : 0,
-    stop_order_id !== undefined ? 1 : 0, stop_order_id || null, protection || null, lot.id);
+    stop_order_id !== undefined ? 1 : 0, stop_order_id || null, protection || null,
+    alert_stop_id !== undefined ? 1 : 0, alert_stop_id || null,
+    alert_target_id !== undefined ? 1 : 0, alert_target_id || null, lot.id);
   res.json({ ok: true, lot: lots(lot.status === 'dry_run' ? 'paper' : 'live').find((l) => l.id === lot.id) });
 });
 
@@ -228,6 +233,9 @@ dashboard.post('/settings', (req, res) => {
     const max = key.endsWith('_pct') ? 90 : 100000;
     if (!(n >= 0) || n > max || (key.endsWith('_pct') && n < 1)) return res.status(400).json({ error: `Bad ${key}` });
     setSetting(key, Math.round(n * 100) / 100);
+  }
+  for (const key of FLAGS) {
+    if (req.body[key] !== undefined) setSetting(key, req.body[key] ? '1' : '0');
   }
   res.json({ ok: true, budget: budgetState() });
 });

@@ -2,6 +2,7 @@ const db = require('../db/init');
 
 const MODES = ['dry_run', 'live', 'paused'];
 const NUMERIC = ['budget_total', 'max_order', 'stop_loss_pct', 'take_profit_pct'];
+const FLAGS = ['crypto_enabled'];
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
@@ -10,6 +11,7 @@ function getSettings() {
   const s = Object.fromEntries(rows.map((r) => [r.key, r.value]));
   const out = { mode: s.mode };
   for (const k of NUMERIC) out[k] = Number(s[k]);
+  for (const k of FLAGS) out[k] = s[k] === '1';
   return out;
 }
 
@@ -82,6 +84,7 @@ function budgetState() {
 const reserve = db.transaction(({ pick_id, symbol, asset_type, amount, price }) => {
   const s = budgetState();
   if (s.mode === 'paused') return { ok: false, error: 'Buying is paused' };
+  if (asset_type === 'crypto' && !s.crypto_enabled) return { ok: false, error: 'Crypto buying is turned off' };
   if (!(amount > 0)) return { ok: false, error: 'Amount must be greater than 0' };
   if (!(price > 0)) return { ok: false, error: 'Current price is required' };
   if (amount > s.max_order) return { ok: false, error: `Amount exceeds the $${s.max_order} per-order cap` };
@@ -105,4 +108,4 @@ const reserve = db.transaction(({ pick_id, symbol, asset_type, amount, price }) 
   };
 });
 
-module.exports = { MODES, NUMERIC, getSettings, setSetting, budgetState, lots, reserve };
+module.exports = { MODES, NUMERIC, FLAGS, getSettings, setSetting, budgetState, lots, reserve };

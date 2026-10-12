@@ -35,7 +35,7 @@ function renderState({ budget, positions, sells, orders }) {
   $('s-left').textContent = money(budget.remaining);
   $('s-pnl').innerHTML = pnlCell(budget.realized_pnl);
   $('meter').style.width = Math.min(100, (budget.deployed / (budget.pot || 1)) * 100) + '%';
-  $('s-note').textContent = `Sells put money back in the pot. Max ${money(budget.max_order)} per buy; trailing stop ${budget.stop_loss_pct}%, take profit +${budget.take_profit_pct}%.`
+  $('s-note').textContent = `Sells put money back in the pot. Max ${money(budget.max_order)} per buy; trailing stop ${budget.stop_loss_pct}%, take profit +${budget.take_profit_pct}%. Crypto ${budget.crypto_enabled ? 'on' : 'off'}.`
     + (budget.book === 'paper' && budget.live.deployed ? ` Real money invested: ${money(budget.live.deployed)}.` : '');
 
   const form = $('settings');
@@ -44,6 +44,7 @@ function renderState({ budget, positions, sells, orders }) {
     form.max_order.value = budget.max_order;
     form.stop_loss_pct.value = budget.stop_loss_pct;
     form.take_profit_pct.value = budget.take_profit_pct;
+    form.crypto_enabled.checked = budget.crypto_enabled;
   }
 
   $('positions').innerHTML = positions.length ? positions.map((p) => `
@@ -51,7 +52,7 @@ function renderState({ budget, positions, sells, orders }) {
     <td>${escapeHtml(p.asset_type)}</td><td class="num">${money(p.cost)}</td><td class="num">${qty(p.filled_qty)}</td>
     <td class="num">${money(p.avg_price)}</td><td class="num">${money(p.high_water)}</td>
     <td class="num">${money(p.stop_price)}</td><td class="num">${money(p.target_price)}</td>
-    <td>${escapeHtml(PROTECTION[p.protection] || 'Not set yet')}</td><td>${escapeHtml(p.created_at)}</td></tr>`).join('')
+    <td>${escapeHtml(PROTECTION[p.protection] || 'Not set yet')}${p.alert_stop_id || p.alert_target_id ? ' + phone alerts' : ''}</td><td>${escapeHtml(p.created_at)}</td></tr>`).join('')
     : '<tr><td colspan="10" class="empty">No open positions.</td></tr>';
 
   $('sells').innerHTML = sells.length ? sells.map((x) => `
@@ -112,6 +113,7 @@ $('settings').addEventListener('submit', async (e) => {
     await saveSettings({
       budget_total: f.budget_total.value, max_order: f.max_order.value,
       stop_loss_pct: f.stop_loss_pct.value, take_profit_pct: f.take_profit_pct.value,
+      crypto_enabled: f.crypto_enabled.checked,
     });
     document.activeElement.blur();
     await refresh();
