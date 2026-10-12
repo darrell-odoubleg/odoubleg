@@ -9,6 +9,7 @@ this repo collects them with `git subtree`, keeping their history.
 | `events/` | events.odoubleg.com | `/var/www/events-odoubleg` | systemd `events-odoubleg` |
 | `mist/` | mist.odoubleg.com | `/var/www/mist-odoubleg` | pm2 `mist-odoubleg` |
 | `sitenotes/` | sitenotes.odoubleg.com | `/var/www/sitenotes-odoubleg` | pm2 `sitenotes-odoubleg` |
+| `stocks/` | stocks.odoubleg.com | `/var/www/stocks-odoubleg` | pm2 `stocks-odoubleg` |
 
 Secrets (`.env`), databases and data caches are not committed — each app
 has a `.env.example` listing the settings it needs.
