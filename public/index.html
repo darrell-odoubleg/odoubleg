@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock Watcher</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <h1>O Double G Stock Watcher</h1>
+    <button id="logout">Sign out</button>
+  </header>
+
+  <main>
+    <section class="card">
+      <div id="mode-banner" class="banner"></div>
+      <div class="modes">
+        <button data-mode="dry_run">Dry run</button>
+        <button data-mode="live">Live — real money</button>
+        <button data-mode="paused">Paused</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Budget</h2>
+      <div class="stats">
+        <div class="stat"><div class="label">Spending cap</div><div class="value num" id="s-total"></div></div>
+        <div class="stat"><div class="label" id="s-used-label">Committed</div><div class="value num" id="s-used"></div></div>
+        <div class="stat"><div class="label">Remaining</div><div class="value num" id="s-left"></div></div>
+        <div class="stat"><div class="label">Max per order</div><div class="value num" id="s-max"></div></div>
+      </div>
+      <div class="meter"><div id="meter"></div></div>
+      <form class="settings" id="settings">
+        <label>Spending cap ($)<input type="number" name="budget_total" min="0" step="1"></label>
+        <label>Max per order ($)<input type="number" name="max_order" min="0" step="1"></label>
+        <button type="submit">Save limits</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Holdings bought by the routine</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Symbol</th><th>Type</th><th>Invested</th><th>Quantity</th><th>Buys</th><th>Last buy</th></tr></thead>
+        <tbody id="holdings"></tbody>
+      </table></div>
+    </section>
+
+    <section class="card">
+      <h2>Research runs</h2>
+      <div id="runs"></div>
+    </section>
+
+    <section class="card">
+      <h2>Orders</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>When (UTC)</th><th>Symbol</th><th>Type</th><th>Amount</th><th>Status</th><th>Filled</th><th>Avg price</th><th>Note</th></tr></thead>
+        <tbody id="orders"></tbody>
+      </table></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
