@@ -71,7 +71,8 @@ db.exec(`
 
 // Exit tracking on each lot.
 const orderCols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
-for (const [col, type] of [['high_water', 'REAL'], ['stop_order_id', 'TEXT'], ['protection', 'TEXT']]) {
+for (const [col, type] of [['high_water', 'REAL'], ['stop_order_id', 'TEXT'], ['protection', 'TEXT'],
+  ['alert_stop_id', 'TEXT'], ['alert_target_id', 'TEXT']]) {
   if (!orderCols.includes(col)) db.exec(`ALTER TABLE orders ADD COLUMN ${col} ${type}`);
 }
 
@@ -81,6 +82,7 @@ const DEFAULTS = {
   max_order: '100',     // cap per single order, dollars
   stop_loss_pct: '8',   // trailing stop: sell when price falls this far below its high
   take_profit_pct: '15',// sell when price is this far above entry
+  crypto_enabled: '0',  // 1 lets the routine buy crypto
 };
 const insertDefault = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
 for (const [k, v] of Object.entries(DEFAULTS)) insertDefault.run(k, v);
