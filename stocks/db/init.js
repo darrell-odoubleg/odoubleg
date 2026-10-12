@@ -49,12 +49,38 @@ db.exec(`
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  -- A filled (or paper) buy is a lot; each lot is sold whole, once.
+  -- status: dry_run | placed | filled | failed
+  -- reason: stop_loss | take_profit | signal
+  CREATE TABLE IF NOT EXISTS sells (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    lot_id          INTEGER NOT NULL REFERENCES orders(id),
+    reason          TEXT NOT NULL CHECK (reason IN ('stop_loss', 'take_profit', 'signal')),
+    status          TEXT NOT NULL,
+    reasoning       TEXT,
+    broker_order_id TEXT,
+    qty             REAL,
+    avg_price       REAL,
+    proceeds        REAL,
+    error           TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
+
+// Exit tracking on each lot.
+const orderCols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
+for (const [col, type] of [['high_water', 'REAL'], ['stop_order_id', 'TEXT'], ['protection', 'TEXT']]) {
+  if (!orderCols.includes(col)) db.exec(`ALTER TABLE orders ADD COLUMN ${col} ${type}`);
+}
 
 const DEFAULTS = {
   mode: 'dry_run',      // dry_run | live | paused
-  budget_total: '500',  // lifetime spending cap, dollars
+  budget_total: '500',  // starting pot, dollars; sells return money to it
   max_order: '100',     // cap per single order, dollars
+  stop_loss_pct: '8',   // trailing stop: sell when price falls this far below its high
+  take_profit_pct: '15',// sell when price is this far above entry
 };
 const insertDefault = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
 for (const [k, v] of Object.entries(DEFAULTS)) insertDefault.run(k, v);

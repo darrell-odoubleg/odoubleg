@@ -25,24 +25,35 @@
     <section class="card">
       <h2>Budget</h2>
       <div class="stats">
-        <div class="stat"><div class="label">Spending cap</div><div class="value num" id="s-total"></div></div>
-        <div class="stat"><div class="label" id="s-used-label">Committed</div><div class="value num" id="s-used"></div></div>
-        <div class="stat"><div class="label">Remaining</div><div class="value num" id="s-left"></div></div>
-        <div class="stat"><div class="label">Max per order</div><div class="value num" id="s-max"></div></div>
+        <div class="stat"><div class="label" id="s-pot-label">Pot</div><div class="value num" id="s-pot"></div></div>
+        <div class="stat"><div class="label">Invested now</div><div class="value num" id="s-used"></div></div>
+        <div class="stat"><div class="label">Available</div><div class="value num" id="s-left"></div></div>
+        <div class="stat"><div class="label">Realized P&amp;L</div><div class="value num" id="s-pnl"></div></div>
       </div>
       <div class="meter"><div id="meter"></div></div>
+      <p class="muted" id="s-note"></p>
       <form class="settings" id="settings">
-        <label>Spending cap ($)<input type="number" name="budget_total" min="0" step="1"></label>
+        <label>Starting pot ($)<input type="number" name="budget_total" min="0" step="1"></label>
         <label>Max per order ($)<input type="number" name="max_order" min="0" step="1"></label>
+        <label>Trailing stop (%)<input type="number" name="stop_loss_pct" min="1" max="90" step="0.5"></label>
+        <label>Take profit (%)<input type="number" name="take_profit_pct" min="1" max="90" step="0.5"></label>
         <button type="submit">Save limits</button>
       </form>
     </section>
 
     <section class="card">
-      <h2>Holdings bought by the routine</h2>
+      <h2>Open positions</h2>
       <div class="table-wrap"><table>
-        <thead><tr><th>Symbol</th><th>Type</th><th>Invested</th><th>Quantity</th><th>Buys</th><th>Last buy</th></tr></thead>
-        <tbody id="holdings"></tbody>
+        <thead><tr><th>Symbol</th><th>Type</th><th>Cost</th><th>Quantity</th><th>Entry</th><th>High</th><th>Sells below</th><th>Takes profit at</th><th>Protection</th><th>Bought (UTC)</th></tr></thead>
+        <tbody id="positions"></tbody>
+      </table></div>
+    </section>
+
+    <section class="card">
+      <h2>Sells</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>When (UTC)</th><th>Symbol</th><th>Reason</th><th>Status</th><th>Cost</th><th>Proceeds</th><th>P&amp;L</th><th>Why</th></tr></thead>
+        <tbody id="sells"></tbody>
       </table></div>
     </section>
 
