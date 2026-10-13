@@ -175,7 +175,12 @@ async function refresh() {
     renderList(el.onlineList, data.online);
     renderList(el.offlineList, data.offline, { offline: true });
     renderSites(data.sites || []);
-    el.errorBanner.hidden = true;
+    if (data.warnings && data.warnings.length) {
+      el.errorBanner.textContent = `Partial data — ${data.warnings.join('; ')}`;
+      el.errorBanner.hidden = false;
+    } else {
+      el.errorBanner.hidden = true;
+    }
 
     // Keep the panel open as long as anything offline hasn't been
     // acknowledged yet — including if the user closes it and a new
