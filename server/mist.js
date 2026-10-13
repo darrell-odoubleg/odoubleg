@@ -152,7 +152,21 @@ async function getSiteSummaries(orgs) {
 }
 
 async function getApStatus() {
-  const orgsByAccount = await Promise.all(ACCOUNTS.map(getOrgsForAccount));
+  // One account losing access (revoked token, removed privileges) shouldn't
+  // blank the dashboard for every other MSP, so failures become warnings.
+  const warnings = [];
+  const orgsByAccount = await Promise.all(
+    ACCOUNTS.map((account, i) =>
+      getOrgsForAccount(account).catch((err) => {
+        console.error(`Failed to load orgs for MIST account ${i + 1} (MSP ${account.mspId}):`, err.message);
+        warnings.push(`Mist account ${i + 1} (MSP ${account.mspId}) unavailable: ${err.message}`);
+        return [];
+      })
+    )
+  );
+  if (ACCOUNTS.length && warnings.length === ACCOUNTS.length) {
+    throw new Error(warnings.join('; '));
+  }
   const orgs = orgsByAccount.flat();
   const [perOrg, siteSummaries] = await Promise.all([
     Promise.all(orgs.map(getApsForOrg)),
@@ -183,6 +197,7 @@ async function getApStatus() {
     online,
     offline,
     sites: Array.from(siteSummaries.values()),
+    warnings,
     fetchedAt: new Date().toISOString(),
   };
 }
