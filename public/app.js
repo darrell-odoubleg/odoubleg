@@ -25,6 +25,11 @@ function fmtLastSeen(iso) {
   return new Date(iso).toLocaleString();
 }
 
+const TYPE_LABELS = { ap: 'AP', switch: 'Switch', gateway: 'Gateway' };
+function typeLabel(type) {
+  return TYPE_LABELS[type] || type || 'Device';
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str == null ? '' : String(str);
@@ -92,13 +97,14 @@ function renderList(listEl, aps, opts = {}) {
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'ap-toggle';
-    toggle.innerHTML = `<span class="ap-name">${escapeHtml(ap.name)}</span><span class="ap-site">${escapeHtml(ap.orgName)} — ${escapeHtml(ap.siteName)}</span>`;
+    toggle.innerHTML = `<span class="ap-name"><span class="type-badge type-${escapeHtml(ap.type || 'other')}">${escapeHtml(typeLabel(ap.type))}</span>${escapeHtml(ap.name)}</span><span class="ap-site">${escapeHtml(ap.orgName)} — ${escapeHtml(ap.siteName)}</span>`;
 
     const details = document.createElement('div');
     details.className = 'ap-details';
     details.hidden = true;
     details.innerHTML = `
       <dl>
+        <dt>Type</dt><dd>${escapeHtml(typeLabel(ap.type))}</dd>
         <dt>Status</dt><dd>${escapeHtml(ap.status || 'unknown')}</dd>
         <dt>Org</dt><dd>${escapeHtml(ap.orgName)}</dd>
         <dt>Site</dt><dd>${escapeHtml(ap.siteName)}</dd>

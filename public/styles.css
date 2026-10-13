@@ -176,6 +176,21 @@ main.wide { max-width: 960px; }
 
 .ap-toggle .ap-site { color: var(--muted); font-size: 0.85rem; }
 
+.type-badge {
+  display: inline-block;
+  min-width: 4.2rem;
+  margin-right: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  text-align: center;
+  color: var(--muted);
+  background: var(--bg);
+}
+.type-badge.type-switch { color: var(--color-primary); border-color: var(--color-primary); }
+.type-badge.type-gateway { color: var(--color-secondary); border-color: var(--color-accent); }
+
 .ap-toggle.expanded { color: var(--color-primary); }
 
 .ap-details { padding: 0 0 0.75rem; }
