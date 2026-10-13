@@ -99,19 +99,22 @@ async function getSitesForOrg(org) {
   return byId;
 }
 
-async function fetchApStatsForOrg(org) {
-  return mistGet(org.token, `/api/v1/orgs/${org.id}/stats/devices?type=ap`);
+// type=all covers APs, switches and gateways; Mist's default page size is
+// 100, so ask for more than any single org has.
+async function fetchDeviceStatsForOrg(org) {
+  return mistGet(org.token, `/api/v1/orgs/${org.id}/stats/devices?type=all&limit=1000`);
 }
 
 async function getApsForOrg(org) {
   try {
     const [devices, sites] = await Promise.all([
-      fetchApStatsForOrg(org),
+      fetchDeviceStatsForOrg(org),
       getSitesForOrg(org),
     ]);
     return devices.map((d) => ({
       id: d.id,
       name: d.name || d.hostname || d.mac,
+      type: d.type,
       mac: d.mac,
       model: d.model,
       serial: d.serial,
@@ -124,7 +127,7 @@ async function getApsForOrg(org) {
       lastSeen: d.last_seen ? new Date(d.last_seen * 1000).toISOString() : null,
     }));
   } catch (err) {
-    console.error(`Failed to fetch APs for org ${org.name} (${org.id}):`, err.message);
+    console.error(`Failed to fetch devices for org ${org.name} (${org.id}):`, err.message);
     return [];
   }
 }
