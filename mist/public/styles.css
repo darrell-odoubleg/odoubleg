@@ -10,6 +10,7 @@
   --muted: #6b6f76;
   --online: #16a34a;
   --offline: #dc2626;
+  --closed: #ca8a04;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -60,7 +61,7 @@ main.wide { max-width: 960px; }
 
 .counts {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
@@ -84,6 +85,14 @@ main.wide { max-width: 960px; }
 
 .count-card.online .count-number { color: var(--online); }
 .count-card.offline .count-number { color: var(--offline); }
+.count-card.closed .count-number { color: var(--closed); }
+
+@media (max-width: 600px) {
+  .counts { gap: 0.5rem; }
+  .count-card { padding: 1rem 0.5rem; }
+  .count-number { font-size: 2rem; }
+  .count-label { font-size: 0.75rem; text-align: center; }
+}
 
 .count-label { color: var(--muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }
 
@@ -105,6 +114,39 @@ main.wide { max-width: 960px; }
 
 .site-popup { font-size: 0.85rem; line-height: 1.5; }
 .site-popup strong { color: var(--text); }
+.site-popup .season-btn { display: block; margin-top: 0.5rem; }
+.closed-tag { color: var(--closed); font-weight: 600; }
+
+.season-btn {
+  margin-top: 0.6rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--closed);
+  border-radius: 6px;
+  background: #fef9c3;
+  color: #713f12;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.season-btn:hover { background: #fde68a; }
+.season-btn.reopen { border-color: var(--online); background: #dcfce7; color: #14532d; }
+.season-btn.reopen:hover { background: #bbf7d0; }
+
+.closed-hint { margin: 0 0 0.75rem; font-size: 0.85rem; }
+.closed-sites { list-style: none; margin: 0 0 1rem; padding: 0; }
+.closed-sites li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.4rem;
+  border: 1px solid var(--closed);
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: #fefce8;
+}
+.closed-sites li .season-btn { margin-top: 0; }
 
 .ap-list { list-style: none; margin: 0; padding: 0; }
 

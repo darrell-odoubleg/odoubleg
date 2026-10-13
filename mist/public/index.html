@@ -29,6 +29,10 @@
         <span class="count-number" id="offline-count">–</span>
         <span class="count-label">Offline</span>
       </button>
+      <button id="closed-card" class="count-card closed" type="button">
+        <span class="count-number" id="closed-count">–</span>
+        <span class="count-label">Closed for season</span>
+      </button>
     </section>
 
     <section class="ap-panel">
@@ -39,6 +43,13 @@
     <section id="offline-panel" class="ap-panel" hidden>
       <h2>Offline devices</h2>
       <ul id="offline-list" class="ap-list"></ul>
+    </section>
+
+    <section id="closed-panel" class="ap-panel" hidden>
+      <h2>Closed for season</h2>
+      <p class="muted closed-hint">Devices at these sites don't count as offline or raise alerts. Close a site from a device's details or its map pin.</p>
+      <ul id="closed-sites" class="closed-sites"></ul>
+      <ul id="closed-list" class="ap-list"></ul>
     </section>
 
     <section id="online-panel" class="ap-panel" hidden>
