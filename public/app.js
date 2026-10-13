@@ -123,8 +123,10 @@ function renderList(listEl, aps, opts = {}) {
 }
 
 const map = L.map('site-map', { scrollWheelZoom: false }).setView([39.8, -98.6], 4);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+// CARTO started watermarking keyless tiles ("API KEY REQUIRED") in Oct 2026;
+// Esri's World Street Map is still served without a key.
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, &copy; OpenStreetMap contributors, and the GIS User Community',
   maxZoom: 19,
 }).addTo(map);
 const siteMarkers = L.layerGroup().addTo(map);
