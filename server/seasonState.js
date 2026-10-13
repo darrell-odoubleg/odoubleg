@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
-// Sites marked "closed for season" (e.g. campgrounds over winter). Their
-// devices are pulled out of the online/offline lists so expected outages
-// don't flash as alerts. Keyed by Mist site id.
-const STATE_FILE = path.join(__dirname, '..', 'data', 'closed-sites.json');
+// Devices marked "closed for season" (e.g. a campground cabin AP that's
+// powered off over winter). They're pulled out of the online/offline lists
+// so expected outages don't flash as alerts. Keyed by Mist device id.
+const STATE_FILE = path.join(__dirname, '..', 'data', 'closed-devices.json');
 
 function loadState() {
   try {
@@ -14,32 +14,33 @@ function loadState() {
   }
 }
 
-const closedSites = loadState();
+const closedDevices = loadState();
 
 function saveState() {
   fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
-  fs.writeFileSync(STATE_FILE, JSON.stringify(Object.fromEntries(closedSites)));
+  fs.writeFileSync(STATE_FILE, JSON.stringify(Object.fromEntries(closedDevices)));
 }
 
-function isClosed(siteId) {
-  return closedSites.has(siteId);
+function isClosed(deviceId) {
+  return closedDevices.has(deviceId);
 }
 
-function listClosed() {
-  return Array.from(closedSites, ([id, s]) => ({ id, ...s }));
+function getClosed(deviceId) {
+  return closedDevices.get(deviceId) || null;
 }
 
-function setClosed(siteId, closed, { siteName, orgName } = {}) {
+function setClosed(deviceId, closed, { name, siteName, orgName } = {}) {
   if (closed) {
-    closedSites.set(siteId, {
+    closedDevices.set(deviceId, {
+      name: name || null,
       siteName: siteName || null,
       orgName: orgName || null,
       closedAt: new Date().toISOString(),
     });
   } else {
-    closedSites.delete(siteId);
+    closedDevices.delete(deviceId);
   }
   saveState();
 }
 
-module.exports = { isClosed, listClosed, setClosed };
+module.exports = { isClosed, getClosed, setClosed };

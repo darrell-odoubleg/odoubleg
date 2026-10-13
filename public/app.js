@@ -13,7 +13,6 @@ const el = {
   closedCard: document.getElementById('closed-card'),
   closedPanel: document.getElementById('closed-panel'),
   closedList: document.getElementById('closed-list'),
-  closedSites: document.getElementById('closed-sites'),
   updatedAt: document.getElementById('updated-at'),
   errorBanner: document.getElementById('error-banner'),
   logoutBtn: document.getElementById('logout-btn'),
@@ -96,7 +95,15 @@ function renderList(listEl, aps, opts = {}) {
 
       ackWrap.appendChild(ticketInput);
       ackWrap.appendChild(ackBtn);
+      ackWrap.appendChild(seasonButton(ap, false));
       row.appendChild(ackWrap);
+    }
+
+    if (opts.closed) {
+      const reopenWrap = document.createElement('div');
+      reopenWrap.className = 'ack-wrap';
+      reopenWrap.appendChild(seasonButton(ap, true));
+      row.appendChild(reopenWrap);
     }
 
     const toggle = document.createElement('button');
@@ -118,9 +125,10 @@ function renderList(listEl, aps, opts = {}) {
         <dt>Serial</dt><dd>${escapeHtml(ap.serial || '—')}</dd>
         <dt>IP</dt><dd>${escapeHtml(ap.ip || '—')}</dd>
         <dt>Last seen</dt><dd>${escapeHtml(fmtLastSeen(ap.lastSeen))}</dd>
+        ${ap.closedAt ? `<dt>Closed</dt><dd>${escapeHtml(new Date(ap.closedAt).toLocaleDateString())}</dd>` : ''}
       </dl>
     `;
-    details.appendChild(seasonButton({ id: ap.siteId, name: ap.siteName, orgName: ap.orgName }, !!opts.closed));
+    if (!opts.offline && !opts.closed) details.appendChild(seasonButton(ap, false));
 
     toggle.addEventListener('click', () => {
       details.hidden = !details.hidden;
@@ -134,51 +142,38 @@ function renderList(listEl, aps, opts = {}) {
   }
 }
 
-// Closing a site moves all of its devices to the "Closed for season" list
-// (server-side, so it applies for every viewer).
-async function setSeason(site, closed) {
-  if (closed && !confirm(`Mark ${site.name} closed for the season?\n\nIts devices will stop counting as offline or raising alerts until it's reopened.`)) {
+// Closing a device moves it to the "Closed for season" list (server-side,
+// so it applies for every viewer).
+async function setSeason(device, closed) {
+  if (closed && !confirm(`Mark ${device.name} (${device.siteName}) closed for the season?\n\nIt will stop counting as offline or raising alerts until it's reopened.`)) {
     return;
   }
   try {
-    const res = await fetch(`/api/sites/${encodeURIComponent(site.id)}/season`, {
+    const res = await fetch(`/api/devices/${encodeURIComponent(device.id)}/season`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ closed, siteName: site.name, orgName: site.orgName }),
+      body: JSON.stringify({ closed }),
     });
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
-    map.closePopup();
     await refresh();
   } catch (err) {
-    el.errorBanner.textContent = `Couldn't update site: ${err.message}`;
+    el.errorBanner.textContent = `Couldn't update device: ${err.message}`;
     el.errorBanner.hidden = false;
   }
 }
 
-function seasonButton(site, isClosed) {
+function seasonButton(device, isClosed) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = isClosed ? 'season-btn reopen' : 'season-btn';
-  btn.textContent = isClosed ? `Reopen ${site.name}` : `Close ${site.name} for season`;
+  btn.textContent = isClosed ? 'Reopen' : 'Closed for season';
+  btn.title = isClosed ? `Reopen ${device.name}` : `Mark ${device.name} closed for the season`;
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    setSeason(site, !isClosed);
+    btn.disabled = true;
+    setSeason(device, !isClosed).finally(() => { btn.disabled = false; });
   });
   return btn;
-}
-
-function renderClosedSites(sites, devices) {
-  el.closedSites.innerHTML = '';
-  for (const site of sites) {
-    const count = devices.filter((d) => d.siteId === site.id).length;
-    const li = document.createElement('li');
-    const label = document.createElement('span');
-    label.innerHTML = `<strong>${escapeHtml(site.siteName || 'Unknown site')}</strong>` +
-      `<span class="muted"> ${escapeHtml(site.orgName || '')} · ${count} device${count === 1 ? '' : 's'}</span>`;
-    li.appendChild(label);
-    li.appendChild(seasonButton({ id: site.id, name: site.siteName || 'site', orgName: site.orgName }, true));
-    el.closedSites.appendChild(li);
-  }
 }
 
 const map = L.map('site-map', { scrollWheelZoom: false }).setView([39.8, -98.6], 4);
@@ -197,23 +192,24 @@ function renderSites(sites) {
 
   const bounds = [];
   for (const site of sites) {
-    const color = site.closed ? '#facc15' : site.offline > 0 ? '#dc2626' : '#16a34a';
+    // Real outages win; yellow only when the site's only down gear is closed for season.
+    const isYellow = site.offline === 0 && site.closed > 0;
+    const color = site.offline > 0 ? '#dc2626' : isYellow ? '#facc15' : '#16a34a';
     const marker = L.circleMarker([site.lat, site.lng], {
       radius: 7,
       weight: 2,
       // yellow needs a dark ring to stand out on the beige basemap
-      color: site.closed ? '#854d0e' : '#ffffff',
+      color: isYellow ? '#854d0e' : '#ffffff',
       fillColor: color,
       fillOpacity: 0.9,
     });
-    const popup = document.createElement('div');
-    popup.className = 'site-popup';
-    popup.innerHTML =
-      `<strong>${escapeHtml(site.name)}</strong><br>` +
+    marker.bindPopup(
+      `<div class="site-popup"><strong>${escapeHtml(site.name)}</strong><br>` +
       `${escapeHtml(site.orgName)}<br>` +
-      (site.closed ? '<span class="closed-tag">Closed for season</span>' : `${site.online} online / ${site.offline} offline`);
-    popup.appendChild(seasonButton(site, site.closed));
-    marker.bindPopup(popup);
+      `${site.online} online / ${site.offline} offline` +
+      (site.closed ? `<br><span class="closed-tag">${site.closed} closed for season</span>` : '') +
+      '</div>'
+    );
     marker.addTo(siteMarkers);
     bounds.push([site.lat, site.lng]);
   }
@@ -240,7 +236,6 @@ async function refresh() {
     renderList(el.onlineList, data.online);
     renderList(el.offlineList, data.offline, { offline: true });
     el.closedCount.textContent = data.counts.closed || 0;
-    renderClosedSites(data.closedSites || [], data.closed || []);
     renderList(el.closedList, data.closed || [], { closed: true });
     renderSites(data.sites || []);
     if (data.warnings && data.warnings.length) {
