@@ -9,6 +9,11 @@ const el = {
   offlinePanel: document.getElementById('offline-panel'),
   onlineList: document.getElementById('online-list'),
   offlineList: document.getElementById('offline-list'),
+  closedCount: document.getElementById('closed-count'),
+  closedCard: document.getElementById('closed-card'),
+  closedPanel: document.getElementById('closed-panel'),
+  closedList: document.getElementById('closed-list'),
+  closedSites: document.getElementById('closed-sites'),
   updatedAt: document.getElementById('updated-at'),
   errorBanner: document.getElementById('error-banner'),
   logoutBtn: document.getElementById('logout-btn'),
@@ -115,6 +120,7 @@ function renderList(listEl, aps, opts = {}) {
         <dt>Last seen</dt><dd>${escapeHtml(fmtLastSeen(ap.lastSeen))}</dd>
       </dl>
     `;
+    details.appendChild(seasonButton({ id: ap.siteId, name: ap.siteName, orgName: ap.orgName }, !!opts.closed));
 
     toggle.addEventListener('click', () => {
       details.hidden = !details.hidden;
@@ -125,6 +131,53 @@ function renderList(listEl, aps, opts = {}) {
     li.appendChild(row);
     li.appendChild(details);
     listEl.appendChild(li);
+  }
+}
+
+// Closing a site moves all of its devices to the "Closed for season" list
+// (server-side, so it applies for every viewer).
+async function setSeason(site, closed) {
+  if (closed && !confirm(`Mark ${site.name} closed for the season?\n\nIts devices will stop counting as offline or raising alerts until it's reopened.`)) {
+    return;
+  }
+  try {
+    const res = await fetch(`/api/sites/${encodeURIComponent(site.id)}/season`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ closed, siteName: site.name, orgName: site.orgName }),
+    });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    map.closePopup();
+    await refresh();
+  } catch (err) {
+    el.errorBanner.textContent = `Couldn't update site: ${err.message}`;
+    el.errorBanner.hidden = false;
+  }
+}
+
+function seasonButton(site, isClosed) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = isClosed ? 'season-btn reopen' : 'season-btn';
+  btn.textContent = isClosed ? `Reopen ${site.name}` : `Close ${site.name} for season`;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setSeason(site, !isClosed);
+  });
+  return btn;
+}
+
+function renderClosedSites(sites, devices) {
+  el.closedSites.innerHTML = '';
+  for (const site of sites) {
+    const count = devices.filter((d) => d.siteId === site.id).length;
+    const li = document.createElement('li');
+    const label = document.createElement('span');
+    label.innerHTML = `<strong>${escapeHtml(site.siteName || 'Unknown site')}</strong>` +
+      `<span class="muted"> ${escapeHtml(site.orgName || '')} · ${count} device${count === 1 ? '' : 's'}</span>`;
+    li.appendChild(label);
+    li.appendChild(seasonButton({ id: site.id, name: site.siteName || 'site', orgName: site.orgName }, true));
+    el.closedSites.appendChild(li);
   }
 }
 
@@ -144,19 +197,23 @@ function renderSites(sites) {
 
   const bounds = [];
   for (const site of sites) {
-    const color = site.offline > 0 ? '#dc2626' : '#16a34a';
+    const color = site.closed ? '#facc15' : site.offline > 0 ? '#dc2626' : '#16a34a';
     const marker = L.circleMarker([site.lat, site.lng], {
       radius: 7,
       weight: 2,
-      color: '#ffffff',
+      // yellow needs a dark ring to stand out on the beige basemap
+      color: site.closed ? '#854d0e' : '#ffffff',
       fillColor: color,
       fillOpacity: 0.9,
     });
-    marker.bindPopup(
-      `<div class="site-popup"><strong>${escapeHtml(site.name)}</strong><br>` +
+    const popup = document.createElement('div');
+    popup.className = 'site-popup';
+    popup.innerHTML =
+      `<strong>${escapeHtml(site.name)}</strong><br>` +
       `${escapeHtml(site.orgName)}<br>` +
-      `${site.online} online / ${site.offline} offline</div>`
-    );
+      (site.closed ? '<span class="closed-tag">Closed for season</span>' : `${site.online} online / ${site.offline} offline`);
+    popup.appendChild(seasonButton(site, site.closed));
+    marker.bindPopup(popup);
     marker.addTo(siteMarkers);
     bounds.push([site.lat, site.lng]);
   }
@@ -182,6 +239,9 @@ async function refresh() {
     el.updatedAt.textContent = `Updated ${new Date(data.fetchedAt).toLocaleTimeString()}`;
     renderList(el.onlineList, data.online);
     renderList(el.offlineList, data.offline, { offline: true });
+    el.closedCount.textContent = data.counts.closed || 0;
+    renderClosedSites(data.closedSites || [], data.closed || []);
+    renderList(el.closedList, data.closed || [], { closed: true });
     renderSites(data.sites || []);
     if (data.warnings && data.warnings.length) {
       el.errorBanner.textContent = `Partial data — ${data.warnings.join('; ')}`;
@@ -206,6 +266,10 @@ async function refresh() {
 
 el.offlineCard.addEventListener('click', () => {
   el.offlinePanel.hidden = !el.offlinePanel.hidden;
+});
+
+el.closedCard.addEventListener('click', () => {
+  el.closedPanel.hidden = !el.closedPanel.hidden;
 });
 
 el.onlineCard.addEventListener('click', () => {

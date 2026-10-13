@@ -1,5 +1,6 @@
 const fetch = require('node-fetch');
 const { annotateOffline } = require('./apState');
+const { isClosed, listClosed } = require('./seasonState');
 
 // Juniper Mist runs several regional cloud shards; a token only lives on one
 // of them and there's no lookup-by-token endpoint, so each account probes
@@ -148,6 +149,7 @@ async function getSiteSummaries(orgs) {
         lng: site.lng,
         online: 0,
         offline: 0,
+        closed: isClosed(siteId),
       });
     }
   });
@@ -179,8 +181,10 @@ async function getApStatus() {
 
   const online = [];
   const offline = [];
+  const closed = [];
   for (const ap of all) {
-    if (ap.status === 'connected') online.push(ap);
+    if (isClosed(ap.siteId)) closed.push(ap);
+    else if (ap.status === 'connected') online.push(ap);
     else offline.push(ap);
     const site = siteSummaries.get(ap.siteId);
     if (site) {
@@ -193,12 +197,15 @@ async function getApStatus() {
     a.orgName.localeCompare(b.orgName) || a.siteName.localeCompare(b.siteName) || a.name.localeCompare(b.name);
   online.sort(byOrgSite);
   offline.sort(byOrgSite);
+  closed.sort(byOrgSite);
   annotateOffline(offline);
 
   return {
-    counts: { online: online.length, offline: offline.length, total: online.length + offline.length },
+    counts: { online: online.length, offline: offline.length, closed: closed.length, total: all.length },
     online,
     offline,
+    closed,
+    closedSites: listClosed(),
     sites: Array.from(siteSummaries.values()),
     warnings,
     fetchedAt: new Date().toISOString(),

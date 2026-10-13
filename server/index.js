@@ -7,6 +7,7 @@ const session = require('express-session');
 const { login, logout, requireAuth } = require('./auth');
 const { getApStatus, acknowledge } = require('./mist');
 const { recordAck, listHistory } = require('./history');
+const { setClosed } = require('./seasonState');
 
 const app = express();
 const PORT = process.env.PORT || 3600;
@@ -92,6 +93,21 @@ app.post('/api/aps/:id/ack', async (req, res) => {
     siteName: ap && ap.siteName,
     ticket: result.ticket,
   });
+  res.json({ ok: true });
+});
+
+// Marks a whole site closed (or reopened) for the season. The cached status
+// is dropped so the next poll re-sorts devices into the right lists.
+app.post('/api/sites/:id/season', (req, res) => {
+  const body = req.body || {};
+  if (typeof body.closed !== 'boolean') {
+    return res.status(400).json({ error: '`closed` must be true or false' });
+  }
+  setClosed(req.params.id, body.closed, {
+    siteName: typeof body.siteName === 'string' ? body.siteName.slice(0, 200) : null,
+    orgName: typeof body.orgName === 'string' ? body.orgName.slice(0, 200) : null,
+  });
+  cache.expiresAt = 0;
   res.json({ ok: true });
 });
 
