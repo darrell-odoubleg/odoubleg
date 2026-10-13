@@ -114,12 +114,11 @@ main.wide { max-width: 960px; }
 
 .site-popup { font-size: 0.85rem; line-height: 1.5; }
 .site-popup strong { color: var(--text); }
-.site-popup .season-btn { display: block; margin-top: 0.5rem; }
 .closed-tag { color: var(--closed); font-weight: 600; }
 
 .season-btn {
-  margin-top: 0.6rem;
-  padding: 0.3rem 0.7rem;
+  padding: 0.3rem 0.6rem;
+  white-space: nowrap;
   border: 1px solid var(--closed);
   border-radius: 6px;
   background: #fef9c3;
@@ -130,23 +129,10 @@ main.wide { max-width: 960px; }
 .season-btn:hover { background: #fde68a; }
 .season-btn.reopen { border-color: var(--online); background: #dcfce7; color: #14532d; }
 .season-btn.reopen:hover { background: #bbf7d0; }
+.season-btn:disabled { opacity: 0.6; cursor: default; }
+.ap-details > .season-btn { margin-top: 0.6rem; }
 
 .closed-hint { margin: 0 0 0.75rem; font-size: 0.85rem; }
-.closed-sites { list-style: none; margin: 0 0 1rem; padding: 0; }
-.closed-sites li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.4rem;
-  border: 1px solid var(--closed);
-  border-left-width: 4px;
-  border-radius: 6px;
-  background: #fefce8;
-}
-.closed-sites li .season-btn { margin-top: 0; }
 
 .ap-list { list-style: none; margin: 0; padding: 0; }
 

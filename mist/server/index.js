@@ -96,17 +96,28 @@ app.post('/api/aps/:id/ack', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Marks a whole site closed (or reopened) for the season. The cached status
-// is dropped so the next poll re-sorts devices into the right lists.
-app.post('/api/sites/:id/season', (req, res) => {
+// Marks a single device closed (or reopened) for the season. The cached
+// status is dropped so the next poll re-sorts it into the right list.
+app.post('/api/devices/:id/season', async (req, res) => {
   const body = req.body || {};
   if (typeof body.closed !== 'boolean') {
     return res.status(400).json({ error: '`closed` must be true or false' });
   }
-  setClosed(req.params.id, body.closed, {
-    siteName: typeof body.siteName === 'string' ? body.siteName.slice(0, 200) : null,
-    orgName: typeof body.orgName === 'string' ? body.orgName.slice(0, 200) : null,
-  });
+
+  let device = null;
+  try {
+    const data = await getCachedApStatus();
+    device = [...data.online, ...data.offline, ...data.closed].find((d) => d.id === req.params.id);
+  } catch (err) {
+    console.error('Failed to look up device for season toggle:', err.message);
+  }
+  if (body.closed && !device) return res.status(404).json({ error: 'Unknown device id' });
+
+  setClosed(req.params.id, body.closed, device ? {
+    name: device.name,
+    siteName: device.siteName,
+    orgName: device.orgName,
+  } : {});
   cache.expiresAt = 0;
   res.json({ ok: true });
 });
