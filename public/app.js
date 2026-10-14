@@ -96,7 +96,6 @@ function renderList(listEl, aps, opts = {}) {
 
       ackWrap.appendChild(ticketInput);
       ackWrap.appendChild(ackBtn);
-      ackWrap.appendChild(seasonControl(ap));
       row.appendChild(ackWrap);
     }
 
@@ -130,7 +129,7 @@ function renderList(listEl, aps, opts = {}) {
         ${ap.closedAt ? `<dt>Closed</dt><dd>${escapeHtml(new Date(ap.closedAt).toLocaleDateString())}</dd>` : ''}
       </dl>
     `;
-    if (!opts.offline && !opts.closed) details.appendChild(seasonControl(ap));
+    details.appendChild(seasonCheckbox(ap, !!opts.closed));
 
     toggle.addEventListener('click', () => {
       details.hidden = !details.hidden;
@@ -148,7 +147,7 @@ function renderList(listEl, aps, opts = {}) {
 // so it applies for every viewer).
 async function setSeason(device, closed) {
   if (closed && !confirm(`Mark ${device.name} (${device.siteName}) closed for the season?\n\nIt will stop counting as offline or raising alerts until it's reopened.`)) {
-    return;
+    return false;
   }
   try {
     const res = await fetch(`/api/devices/${encodeURIComponent(device.id)}/season`, {
@@ -161,9 +160,11 @@ async function setSeason(device, closed) {
       throw new Error(data.error || `Server returned ${res.status}`);
     }
     await refresh();
+    return true;
   } catch (err) {
     el.errorBanner.textContent = `Couldn't update device: ${err.message}`;
     el.errorBanner.hidden = false;
+    return false;
   }
 }
 
@@ -182,14 +183,32 @@ function seasonButton(device, isClosed) {
 }
 
 // Vacation mode needs an active contract on the device's site (set by an
-// admin on /admin); without one, show why instead of the button.
-function seasonControl(device) {
-  if (device.vacationAllowed) return seasonButton(device, false);
-  const note = document.createElement('span');
-  note.className = 'season-note';
-  note.textContent = 'No active contract';
-  note.title = `${device.siteName} needs an active contract before its devices can be closed for the season`;
-  return note;
+// admin on /admin), so the box is disabled without one. Unchecking a closed
+// device reopens it regardless.
+function seasonCheckbox(device, isClosed) {
+  const label = document.createElement('label');
+  label.className = 'season-check';
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.checked = isClosed;
+  box.disabled = !isClosed && !device.vacationAllowed;
+  label.appendChild(box);
+  label.appendChild(document.createTextNode(' Closed for season'));
+  if (box.disabled) {
+    label.classList.add('disabled');
+    label.title = `${device.siteName} needs an active contract before its devices can be closed for the season`;
+    const hint = document.createElement('span');
+    hint.className = 'season-hint';
+    hint.textContent = 'requires an active site contract';
+    label.appendChild(hint);
+  }
+  box.addEventListener('change', () => {
+    box.disabled = true;
+    setSeason(device, box.checked).then((done) => {
+      if (!done) box.checked = !box.checked;
+    }).finally(() => { box.disabled = false; });
+  });
+  return label;
 }
 
 const map = L.map('site-map', { scrollWheelZoom: false }).setView([39.8, -98.6], 4);
