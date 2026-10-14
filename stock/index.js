@@ -44,7 +44,8 @@ pna.get('/pna', async (req, res) => {
   const now = Date.now(), miss = parts.filter(p => !(cache.get(p.toUpperCase())?.t > now - TTL));
   try {
     if (miss.length) {
-      const body = `<?xml version="1.0" encoding="UTF-8"?><priceRequest><customerNo>${esc(SYNNEX_CUST)}</customerNo><userName>${esc(SYNNEX_USER)}</userName><password>${esc(SYNNEX_PASS)}</password>${miss.map((p, i) => `<skuList><mfgPN>${esc(p)}</mfgPN><lineNumber>${i + 1}</lineNumber></skuList>`).join('')}</priceRequest>`;
+      // TD SYNNEX matches mfgPN case-sensitively and Juniper part numbers are uppercase.
+      const body = `<?xml version="1.0" encoding="UTF-8"?><priceRequest><customerNo>${esc(SYNNEX_CUST)}</customerNo><userName>${esc(SYNNEX_USER)}</userName><password>${esc(SYNNEX_PASS)}</password>${miss.map((p, i) => `<skuList><mfgPN>${esc(p.toUpperCase())}</mfgPN><lineNumber>${i + 1}</lineNumber></skuList>`).join('')}</priceRequest>`;
       const r = await fetch(SYNNEX_URL, { method: 'POST', headers: { 'Content-Type': 'application/xml' }, body });
       const xml = await r.text();
       if (!r.ok) throw new Error(`TD SYNNEX HTTP ${r.status}`);
