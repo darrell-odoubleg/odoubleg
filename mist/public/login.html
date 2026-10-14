@@ -41,7 +41,7 @@
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        window.location.href = '/';
+        window.location.href = new URLSearchParams(location.search).has('admin') ? '/admin' : '/';
       } else {
         const data = await res.json().catch(() => ({}));
         errorEl.textContent = data.error || 'Sign in failed';

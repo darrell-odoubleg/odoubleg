@@ -1,6 +1,7 @@
 const fetch = require('node-fetch');
 const { annotateOffline } = require('./apState');
-const { isClosed, getClosed } = require('./seasonState');
+const { isClosed, getClosed, setClosed } = require('./seasonState');
+const { getContract, contractStatus, hasActiveContract } = require('./contracts');
 
 // Juniper Mist runs several regional cloud shards; a token only lives on one
 // of them and there's no lookup-by-token endpoint, so each account probes
@@ -156,9 +157,9 @@ async function getSiteSummaries(orgs) {
   return byId;
 }
 
-async function getApStatus() {
-  // One account losing access (revoked token, removed privileges) shouldn't
-  // blank the dashboard for every other MSP, so failures become warnings.
+// One account losing access (revoked token, removed privileges) shouldn't
+// blank the dashboard for every other MSP, so failures become warnings.
+async function getAllOrgs() {
   const warnings = [];
   const orgsByAccount = await Promise.all(
     ACCOUNTS.map((account, i) =>
@@ -172,7 +173,26 @@ async function getApStatus() {
   if (ACCOUNTS.length && warnings.length === ACCOUNTS.length) {
     throw new Error(warnings.join('; '));
   }
-  const orgs = orgsByAccount.flat();
+  return { orgs: orgsByAccount.flat(), warnings };
+}
+
+// Every site across every org, with or without coordinates — for the admin
+// contracts page, which needs sites the map can't show.
+async function listSites() {
+  const { orgs, warnings } = await getAllOrgs();
+  const perOrgSites = await Promise.all(orgs.map(getSitesForOrg));
+  const sites = [];
+  orgs.forEach((org, i) => {
+    for (const [siteId, site] of perOrgSites[i]) {
+      sites.push({ id: siteId, name: site.name, orgId: org.id, orgName: org.name });
+    }
+  });
+  sites.sort((a, b) => a.orgName.localeCompare(b.orgName) || a.name.localeCompare(b.name));
+  return { sites, warnings };
+}
+
+async function getApStatus() {
+  const { orgs, warnings } = await getAllOrgs();
   const [perOrg, siteSummaries] = await Promise.all([
     Promise.all(orgs.map(getApsForOrg)),
     getSiteSummaries(orgs),
@@ -184,6 +204,16 @@ async function getApStatus() {
   const closed = [];
   for (const ap of all) {
     const site = siteSummaries.get(ap.siteId);
+    ap.vacationAllowed = hasActiveContract(ap.siteId);
+    const contract = getContract(ap.siteId);
+    ap.contractEnd = contract ? contract.end : null;
+
+    // Vacation mode only lasts as long as the site's contract does.
+    if (isClosed(ap.id) && !ap.vacationAllowed) {
+      console.log(`Reopening ${ap.name} (${ap.siteName}): site contract ${contractStatus(contract)}`);
+      setClosed(ap.id, false);
+    }
+
     if (isClosed(ap.id)) {
       ap.closedAt = getClosed(ap.id).closedAt;
       closed.push(ap);
@@ -215,4 +245,4 @@ async function getApStatus() {
   };
 }
 
-module.exports = { getApStatus, acknowledge: require('./apState').acknowledge };
+module.exports = { getApStatus, listSites, acknowledge: require('./apState').acknowledge };
