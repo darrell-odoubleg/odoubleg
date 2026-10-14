@@ -129,6 +129,7 @@ function renderList(listEl, aps, opts = {}) {
         ${ap.closedAt ? `<dt>Closed</dt><dd>${escapeHtml(new Date(ap.closedAt).toLocaleDateString())}</dd>` : ''}
       </dl>
     `;
+    if (ap.mistUrl) details.appendChild(mistLink(ap.mistUrl));
     details.appendChild(seasonCheckbox(ap, !!opts.closed));
 
     toggle.addEventListener('click', () => {
@@ -180,6 +181,16 @@ function seasonButton(device, isClosed) {
     setSeason(device, !isClosed).finally(() => { btn.disabled = false; });
   });
   return btn;
+}
+
+function mistLink(url) {
+  const a = document.createElement('a');
+  a.className = 'mist-link';
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = 'Open in Mist ↗';
+  return a;
 }
 
 // Vacation mode needs an active contract on the device's site (set by an
@@ -243,6 +254,7 @@ function renderSites(sites) {
       `${escapeHtml(site.orgName)}<br>` +
       `${site.online} online / ${site.offline} offline` +
       (site.closed ? `<br><span class="closed-tag">${site.closed} closed for season</span>` : '') +
+      (site.mistUrl ? `<br><a href="${escapeHtml(site.mistUrl)}" target="_blank" rel="noopener">Open in Mist ↗</a>` : '') +
       '</div>'
     );
     marker.addTo(siteMarkers);

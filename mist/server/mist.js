@@ -107,6 +107,27 @@ async function fetchDeviceStatsForOrg(org) {
   return mistGet(org.token, `/api/v1/orgs/${org.id}/stats/devices?type=all&limit=1000`);
 }
 
+// Mist's web UI lives on the shard matching the API host
+// (api.ac2.mist.com -> manage.ac2.mist.com).
+function manageHostFor(token) {
+  const host = hostByToken.get(token);
+  return host ? host.replace(/^api\./, 'manage.') : null;
+}
+
+const DETAIL_PAGES = { ap: 'ap', switch: 'switch', gateway: 'gateway' };
+
+function mistDeviceUrl(org, d) {
+  const host = manageHostFor(org.token);
+  const page = DETAIL_PAGES[d.type];
+  if (!host || !page || !d.site_id) return null;
+  return `https://${host}/admin/?org_id=${org.id}#!${page}/detail/${d.id}/${d.site_id}`;
+}
+
+function mistSiteUrl(org, siteId) {
+  const host = manageHostFor(org.token);
+  return host ? `https://${host}/admin/?org_id=${org.id}#!ap/${siteId}` : null;
+}
+
 async function getApsForOrg(org) {
   try {
     const [devices, sites] = await Promise.all([
@@ -114,6 +135,7 @@ async function getApsForOrg(org) {
       getSitesForOrg(org),
     ]);
     return devices.map((d) => ({
+      mistUrl: mistDeviceUrl(org, d),
       id: d.id,
       name: d.name || d.hostname || d.mac,
       type: d.type,
@@ -148,6 +170,7 @@ async function getSiteSummaries(orgs) {
         orgName: org.name,
         lat: site.lat,
         lng: site.lng,
+        mistUrl: mistSiteUrl(org, siteId),
         online: 0,
         offline: 0,
         closed: 0,
