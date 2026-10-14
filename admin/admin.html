@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Site Contracts — Mist AP Status</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <img src="/logo.png" alt="Vision Net" class="logo">
+    <div class="topbar-right">
+      <a href="/" class="link-btn">Back to dashboard</a>
+      <button id="logout-btn" class="link-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main class="wide">
+    <section class="ap-panel">
+      <h2>Site contracts</h2>
+      <p class="muted closed-hint">Devices can only be put into vacation mode (closed for season) while their site has a contract covering today<span id="today-label"></span>. When a contract ends or is removed, its devices are reopened automatically.</p>
+      <div class="contract-toolbar">
+        <input id="site-filter" type="text" class="history-filter" placeholder="Filter by org or site…">
+        <label class="muted contract-only"><input id="with-contract" type="checkbox"> Only sites with a contract</label>
+      </div>
+      <div class="history-table-wrap">
+        <table class="history-table contract-table">
+          <thead>
+            <tr>
+              <th>Org</th>
+              <th>Site</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Notes</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="sites-body"></tbody>
+        </table>
+      </div>
+      <p id="sites-empty" class="muted" hidden>No sites match.</p>
+    </section>
+
+    <p id="error-banner" class="error" hidden></p>
+  </main>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

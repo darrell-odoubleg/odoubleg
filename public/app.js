@@ -16,6 +16,7 @@ const el = {
   updatedAt: document.getElementById('updated-at'),
   errorBanner: document.getElementById('error-banner'),
   logoutBtn: document.getElementById('logout-btn'),
+  adminLink: document.getElementById('admin-link'),
 };
 
 function fmtLastSeen(iso) {
@@ -95,7 +96,7 @@ function renderList(listEl, aps, opts = {}) {
 
       ackWrap.appendChild(ticketInput);
       ackWrap.appendChild(ackBtn);
-      ackWrap.appendChild(seasonButton(ap, false));
+      ackWrap.appendChild(seasonControl(ap));
       row.appendChild(ackWrap);
     }
 
@@ -125,10 +126,11 @@ function renderList(listEl, aps, opts = {}) {
         <dt>Serial</dt><dd>${escapeHtml(ap.serial || '—')}</dd>
         <dt>IP</dt><dd>${escapeHtml(ap.ip || '—')}</dd>
         <dt>Last seen</dt><dd>${escapeHtml(fmtLastSeen(ap.lastSeen))}</dd>
+        <dt>Contract</dt><dd>${ap.contractEnd ? `${ap.vacationAllowed ? 'Active' : 'Not active'} — ends ${escapeHtml(ap.contractEnd)}` : 'None'}</dd>
         ${ap.closedAt ? `<dt>Closed</dt><dd>${escapeHtml(new Date(ap.closedAt).toLocaleDateString())}</dd>` : ''}
       </dl>
     `;
-    if (!opts.offline && !opts.closed) details.appendChild(seasonButton(ap, false));
+    if (!opts.offline && !opts.closed) details.appendChild(seasonControl(ap));
 
     toggle.addEventListener('click', () => {
       details.hidden = !details.hidden;
@@ -154,7 +156,10 @@ async function setSeason(device, closed) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ closed }),
     });
-    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Server returned ${res.status}`);
+    }
     await refresh();
   } catch (err) {
     el.errorBanner.textContent = `Couldn't update device: ${err.message}`;
@@ -174,6 +179,17 @@ function seasonButton(device, isClosed) {
     setSeason(device, !isClosed).finally(() => { btn.disabled = false; });
   });
   return btn;
+}
+
+// Vacation mode needs an active contract on the device's site (set by an
+// admin on /admin); without one, show why instead of the button.
+function seasonControl(device) {
+  if (device.vacationAllowed) return seasonButton(device, false);
+  const note = document.createElement('span');
+  note.className = 'season-note';
+  note.textContent = 'No active contract';
+  note.title = `${device.siteName} needs an active contract before its devices can be closed for the season`;
+  return note;
 }
 
 const map = L.map('site-map', { scrollWheelZoom: false }).setView([39.8, -98.6], 4);
@@ -275,6 +291,10 @@ el.logoutBtn.addEventListener('click', async () => {
   await fetch('/logout', { method: 'POST' });
   window.location.href = '/login.html';
 });
+
+fetch('/api/me').then((r) => r.json()).then((me) => {
+  if (me.admin) el.adminLink.hidden = false;
+}).catch(() => {});
 
 refresh();
 setInterval(refresh, REFRESH_MS);

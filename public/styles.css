@@ -349,3 +349,35 @@ main.wide { max-width: 960px; }
 }
 
 .login-card button:hover { background: var(--color-accent); }
+
+.contract-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 1rem; }
+.contract-toolbar .history-filter { margin-bottom: 0; }
+.contract-only { display: flex; align-items: center; gap: 0.35rem; }
+
+.contract-input {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--bg);
+}
+.contract-input:focus { outline: none; border-color: var(--color-primary); }
+.contract-notes { width: 160px; }
+.contract-actions { display: flex; align-items: center; gap: 0.5rem; }
+.contract-actions .link-btn { color: var(--offline); }
+
+.contract-status {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.contract-status.status-active { color: #14532d; background: #dcfce7; border-color: var(--online); }
+.contract-status.status-upcoming { color: var(--color-primary); border-color: var(--color-primary); }
+.contract-status.status-expired { color: #7f1d1d; background: #fee2e2; border-color: var(--offline); }
+
+.season-note { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }

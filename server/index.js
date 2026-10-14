@@ -4,14 +4,17 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const express = require('express');
 const session = require('express-session');
 
-const { login, logout, requireAuth } = require('./auth');
-const { getApStatus, acknowledge } = require('./mist');
+const { login, logout, requireAuth, requireAdmin } = require('./auth');
+const { getApStatus, listSites, acknowledge } = require('./mist');
 const { recordAck, listHistory } = require('./history');
 const { setClosed } = require('./seasonState');
+const { today, getContract, contractStatus, hasActiveContract, setContract, deleteContract } = require('./contracts');
 
 const app = express();
 const PORT = process.env.PORT || 3600;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+// Outside PUBLIC_DIR so the static handler can't serve it ahead of requireAdmin.
+const ADMIN_DIR = path.join(__dirname, '..', 'admin');
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || 'mist.odoubleg.com';
 
 // nginx terminates TLS in front of this app.
@@ -112,6 +115,10 @@ app.post('/api/devices/:id/season', async (req, res) => {
     console.error('Failed to look up device for season toggle:', err.message);
   }
   if (body.closed && !device) return res.status(404).json({ error: 'Unknown device id' });
+  // Reopening is always allowed; closing needs a site contract covering today.
+  if (body.closed && !hasActiveContract(device.siteId)) {
+    return res.status(403).json({ error: `${device.siteName} has no active contract, so its devices can't be put in vacation mode` });
+  }
 
   setClosed(req.params.id, body.closed, device ? {
     name: device.name,
@@ -127,7 +134,63 @@ app.get('/api/ack-history', (req, res) => {
   res.json({ history: listHistory({ apId }) });
 });
 
-app.get('/api/me', (req, res) => res.json({ user: process.env.APP_USERNAME }));
+app.get('/api/me', (req, res) => res.json({
+  user: req.session.admin ? process.env.ADMIN_USERNAME : process.env.APP_USERNAME,
+  admin: !!req.session.admin,
+}));
+
+app.get('/admin', requireAdmin, (req, res) => res.sendFile(path.join(ADMIN_DIR, 'admin.html')));
+app.get('/admin.js', requireAdmin, (req, res) => res.sendFile(path.join(ADMIN_DIR, 'admin.js')));
+
+app.get('/api/admin/sites', requireAdmin, async (req, res) => {
+  try {
+    const { sites, warnings } = await listSites();
+    // closed-device counts come from the cached status the dashboard already uses
+    const closedBySite = new Map();
+    try {
+      for (const d of (await getCachedApStatus()).closed) {
+        closedBySite.set(d.siteId, (closedBySite.get(d.siteId) || 0) + 1);
+      }
+    } catch (err) {
+      console.error('Failed to count closed devices for admin page:', err.message);
+    }
+    const day = today();
+    res.json({
+      today: day,
+      warnings,
+      sites: sites.map((s) => {
+        const contract = getContract(s.id);
+        return { ...s, contract, status: contractStatus(contract, day), closed: closedBySite.get(s.id) || 0 };
+      }),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(502).json({ error: 'Failed to reach Mist API', detail: err.message });
+  }
+});
+
+app.put('/api/admin/contracts/:siteId', requireAdmin, async (req, res) => {
+  const body = req.body || {};
+  let site = null;
+  try {
+    site = (await listSites()).sites.find((s) => s.id === req.params.siteId);
+  } catch (err) {
+    console.error('Failed to look up site for contract:', err.message);
+  }
+  if (!site) return res.status(404).json({ error: 'Unknown site id' });
+
+  const result = setContract(site.id, { ...body, siteName: site.name, orgName: site.orgName });
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  // a shortened contract may need to reopen devices on the next poll
+  cache.expiresAt = 0;
+  res.json({ ok: true, contract: result.contract, status: contractStatus(result.contract) });
+});
+
+app.delete('/api/admin/contracts/:siteId', requireAdmin, (req, res) => {
+  deleteContract(req.params.siteId);
+  cache.expiresAt = 0;
+  res.json({ ok: true });
+});
 
 app.get('/', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
