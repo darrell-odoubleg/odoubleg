@@ -245,7 +245,8 @@ function blankLine() {
 function newQuote() {
   if (dirty && !confirm('Discard unsaved changes?')) return;
   cur = { id: null, client: '', event_name: '', venue: '', location_city: '', start_date: '', end_date: '', status: 'draft', notes: '',
-    data: { schedule: [{ date: '', in: '08:00', out: '17:00' }], lines: [blankLine()], payroll_fee_pct: config.settings.payroll_fee_pct, include_expenses: true } };
+    data: { schedule: [{ date: '', in: '08:00', out: '17:00' }], lines: [blankLine()], payroll_fee_pct: config.settings.payroll_fee_pct, include_expenses: true,
+      ot_mode: 'weekly', daily_ot_hours: config.settings.daily_ot_threshold } };
   dirty = false;
   renderEditor();
   switchToEdit();
@@ -427,6 +428,13 @@ function renderSummary(t) {
   const row = (label, val, cls = '') => `<tr class="${cls}"><td>${label}</td><td>${val}</td></tr>`;
   $('summaryTable').innerHTML =
     row('Crew', t.people) +
+    `<tr><td colspan="2" style="padding-bottom:0.5rem;text-align:left">Overtime
+      <select id="otMode" style="padding:0.2rem;border:1px solid #d1d5db;border-radius:4px">
+        <option value="weekly"${t.otMode === 'weekly' ? ' selected' : ''}>Weekly (after ${config.settings.ot_threshold})</option>
+        <option value="daily"${t.otMode === 'daily' ? ' selected' : ''}>Daily</option>
+        <option value="both"${t.otMode === 'both' ? ' selected' : ''}>Daily + weekly</option>
+      </select>
+      <span id="dailyWrap"${t.otMode === 'weekly' ? ' class="hidden"' : ''}> after <input type="number" id="dailyHrs" min="1" step="0.5" value="${t.dailyOtHours}"> hrs/call</span></td></tr>` +
     row('Regular', money(t.reg)) +
     (t.ot ? row('Overtime (1.5×)', money(t.ot)) : '') +
     (t.dtPay ? row('Double time (2×)', money(t.dtPay)) : '') +
@@ -437,6 +445,8 @@ function renderSummary(t) {
     row(`<label style="display:inline-flex;gap:0.35rem;align-items:center"><input type="checkbox" id="inclExp"${t.includeExpenses ? ' checked' : ''}> Bill expenses</label>`, money(t.expenses), 'sep') +
     row('Total', money(t.total), 'grand');
   $('feePct').oninput = e => { cur.data.payroll_fee_pct = e.target.value === '' ? null : Number(e.target.value); markDirty(); recalcKeepFocus('feePct'); };
+  $('otMode').onchange = e => { cur.data.ot_mode = e.target.value; markDirty(); recalc(); };
+  $('dailyHrs').oninput = e => { cur.data.daily_ot_hours = e.target.value === '' ? null : Number(e.target.value); markDirty(); recalcKeepFocus('dailyHrs'); };
   $('inclExp').onchange = e => { cur.data.include_expenses = e.target.checked; markDirty(); recalc(); };
 }
 
@@ -522,14 +532,19 @@ function printQuote() {
       </tbody>
     </table>
     ${cur.notes ? `<p style="margin-top:14pt;white-space:pre-wrap">${esc(cur.notes)}</p>` : ''}
-    <p style="margin-top:18pt;font-size:9pt;color:#555">Overtime is billed at 1.5× after ${config.settings.ot_threshold} hours per person; hours after midnight are billed at 2×. Final invoice is based on actual hours worked.</p>`;
+    <p style="margin-top:18pt;font-size:9pt;color:#555">Overtime is billed at 1.5× ${otText(t)}; hours after midnight are billed at 2×. Final invoice is based on actual hours worked.</p>`;
   window.print();
+}
+
+function otText(t) {
+  const wk = `after ${config.settings.ot_threshold} hours per person`, dy = `after ${t.dailyOtHours} hours in a call`;
+  return t.otMode === 'daily' ? dy : t.otMode === 'both' ? `${dy} and ${wk}` : wk;
 }
 
 // ---------- Rates & settings ----------
 const SETTING_LABELS = {
   markup: 'Markup (bill = pay ×)', payroll_fee_pct: 'Payroll fee %', hotel_rate: 'Hotel per night $', per_diem_rate: 'Per diem per day $',
-  mileage_rate: 'Mileage $ per mile', ot_threshold: 'OT after (hours)', ot_multiplier: 'OT multiplier', dt_multiplier: 'Double-time multiplier',
+  mileage_rate: 'Mileage $ per mile', ot_threshold: 'Weekly OT after (hours)', daily_ot_threshold: 'Daily OT after (hours)', ot_multiplier: 'OT multiplier', dt_multiplier: 'Double-time multiplier',
 };
 
 function renderRates() {
