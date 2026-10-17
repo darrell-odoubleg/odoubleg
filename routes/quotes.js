@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS quotes (
   end_date TEXT,
   status TEXT NOT NULL DEFAULT 'draft', -- draft, sent, accepted, declined
   notes TEXT,
-  data TEXT NOT NULL,     -- JSON: { lines, payroll_fee_pct, include_expenses }
+  data TEXT NOT NULL,     -- JSON: { schedule, lines, payroll_fee_pct, include_expenses, ot_mode, daily_ot_hours }
   total REAL,
   created_by INTEGER REFERENCES admins(id),
   created_at TEXT DEFAULT (datetime('now')),
@@ -62,7 +62,8 @@ const DEFAULT_SETTINGS = {
   hotel_rate: 115,
   per_diem_rate: 68,
   mileage_rate: 0.76,
-  ot_threshold: 40,
+  ot_threshold: 40,      // weekly OT after this many hours per person
+  daily_ot_threshold: 8, // daily OT after this many hours in a call (when a quote uses daily OT)
   ot_multiplier: 1.5,
   dt_multiplier: 2,
 };
@@ -127,6 +128,8 @@ function cleanData(data) {
     lines,
     payroll_fee_pct: d.payroll_fee_pct === '' || d.payroll_fee_pct == null ? null : Number(d.payroll_fee_pct),
     include_expenses: d.include_expenses !== false,
+    ot_mode: ['weekly', 'daily', 'both'].includes(d.ot_mode) ? d.ot_mode : 'weekly',
+    daily_ot_hours: d.daily_ot_hours === '' || d.daily_ot_hours == null ? null : Number(d.daily_ot_hours) || null,
   };
 }
 
