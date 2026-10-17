@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quotes | O Double G Events</title><link rel="stylesheet" href="/css/style.css">
+<style>
+  .hidden { display: none !important; }
+  main { max-width: 1200px; }
+  input, select, textarea { font-family: inherit; }
+  .field input, .field select, .field textarea, .inp { width: 100%; padding: 0.45rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.92rem; background: white; }
+  .field label { display: block; margin: 0.6rem 0 0.25rem; font-weight: 600; font-size: 0.85rem; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 1rem; }
+  .grid .span2 { grid-column: span 2; }
+  .grid .span4 { grid-column: span 4; }
+  button.secondary { background: white; color: var(--navy); border: 1px solid #cbd5e1; padding: 0.45rem 0.9rem; border-radius: 5px; cursor: pointer; font-size: 0.88rem; }
+  button.secondary:hover { border-color: var(--navy); }
+  button.link { background: none; border: none; color: var(--navy); cursor: pointer; font-size: 0.82rem; padding: 0; text-decoration: underline; }
+  button.link.danger { color: var(--red); }
+  button:disabled { opacity: 0.55; cursor: default; }
+  .bar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-bottom: 1rem; }
+  .bar .grow { flex: 1; }
+  .hint { color: var(--gray); font-size: 0.82rem; margin: 0.2rem 0 0.5rem; }
+  .ok { color: var(--green); font-size: 0.88rem; }
+  .shift-row { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) auto; gap: 0.5rem; align-items: center; margin-bottom: 0.35rem; }
+  .shift-row input, .line input, .line select, .grid input, .grid select { min-width: 0; }
+  .shift-row input { padding: 0.35rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.88rem; width: 100%; }
+  .line { background: white; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--navy); }
+  .line-top { display: grid; grid-template-columns: 2.4fr 0.7fr 1fr 0.9fr auto; gap: 0.6rem; align-items: end; }
+  .line-mid { display: grid; grid-template-columns: 0.8fr 0.8fr 1.6fr 0.9fr auto; gap: 0.6rem; align-items: end; margin-top: 0.6rem; }
+  .line label { display: block; font-weight: 600; font-size: 0.78rem; color: var(--gray); margin-bottom: 0.2rem; }
+  .line-shifts { margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dashed #e5e7eb; }
+  .line-calc { margin-top: 0.6rem; display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; font-size: 0.85rem; color: var(--gray); }
+  .line-calc b { color: var(--navy); }
+  .line-calc .total { margin-left: auto; font-size: 1rem; color: var(--navy); font-weight: 700; }
+  .layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.25rem; align-items: start; }
+  .summary { position: sticky; top: 1rem; }
+  .summary table td { padding: 0.35rem 0; border: none; }
+  .summary table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .summary .sep td { border-top: 1px solid #e5e7eb; }
+  .summary .grand td { font-size: 1.15rem; font-weight: 700; border-top: 2px solid var(--navy); padding-top: 0.5rem; }
+  .summary input[type=number] { width: 60px; padding: 0.2rem; border: 1px solid #d1d5db; border-radius: 4px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.78rem; font-weight: 600; text-transform: capitalize; }
+  .badge.draft { background: #e5e7eb; color: var(--gray); }
+  .badge.sent { background: #fef3c7; color: #92400e; }
+  .badge.accepted { background: #d1fae5; color: var(--green); }
+  .badge.declined { background: #fee2e2; color: var(--red); }
+  #quoteList tr.click { cursor: pointer; }
+  #quoteList tr.click:hover td { background: #faf7f0; }
+  .rates-table input, .rates-table select { padding: 0.3rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.88rem; width: 100%; }
+  #printDoc { display: none; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .summary { position: static; }
+    .grid { grid-template-columns: 1fr 1fr; }
+    .grid .span4 { grid-column: span 2; }
+    .line-top, .line-mid { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+    .grid { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+    header { flex-wrap: wrap; gap: 0.5rem; }
+    .shift-row { gap: 0.3rem; }
+    .shift-row input { font-size: 0.8rem; padding: 0.3rem 0.2rem; }
+    .line-top > :first-child, .line-mid > :nth-child(3) { grid-column: span 2; }
+    main { padding: 0 1rem; } header { padding: 1rem; } header h1 { font-size: 1.1rem; }
+    .table-wrap { overflow-x: auto; }
+  }
+  @media print {
+    header, main { display: none !important; }
+    body { background: white; }
+    #printDoc { display: block; padding: 0.25in; font-size: 11pt; color: #000; }
+    #printDoc h1 { margin: 0; font-size: 20pt; }
+    #printDoc table { width: 100%; border-collapse: collapse; }
+    #printDoc th, #printDoc td { border-bottom: 1px solid #ccc; padding: 4pt 6pt; font-size: 10pt; }
+    #printDoc .num { text-align: right; }
+    #printDoc .tot td { border: none; }
+    #printDoc .grand td { font-weight: 700; font-size: 12pt; border-top: 2px solid #000; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>O DOUBLE G &mdash; QUOTES</h1>
+  <div><a href="/admin-dashboard.html">Admin</a> <button onclick="logout()">Log Out</button></div>
+</header>
+<main>
+  <div class="tabs">
+    <button class="active" data-tab="list" onclick="showTab('list')">Quotes</button>
+    <button data-tab="edit" onclick="showTab('edit')" id="editTabBtn">New Quote</button>
+    <button data-tab="rates" onclick="showTab('rates')">Rates &amp; Settings</button>
+  </div>
+
+  <!-- ===== Quote list ===== -->
+  <div id="tab-list">
+    <div class="bar">
+      <input class="inp grow" id="listFilter" placeholder="Search client, event, city…" oninput="renderList()">
+      <button class="primary" onclick="newQuote()">+ New Quote</button>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>Client</th><th>Event</th><th>Location</th><th>Dates</th><th>Status</th><th class="num">Total</th><th>Updated</th></tr></thead>
+        <tbody id="quoteList"><tr><td colspan="7">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== Editor ===== -->
+  <div id="tab-edit" class="hidden">
+    <div class="layout">
+      <div>
+        <div class="card">
+          <h3 id="editTitle">New Quote</h3>
+          <div class="grid field">
+            <div class="span2"><label>Client</label><input id="q_client"></div>
+            <div class="span2"><label>Event</label><input id="q_event_name"></div>
+            <div class="span2"><label>Venue</label><input id="q_venue"></div>
+            <div class="span2"><label>Location city (mileage is measured from here)</label><input id="q_location_city" placeholder="e.g. Helena, MT"></div>
+            <div><label>Start date</label><input type="date" id="q_start_date"></div>
+            <div><label>End date</label><input type="date" id="q_end_date"></div>
+            <div><label>Status</label>
+              <select id="q_status"><option value="draft">Draft</option><option value="sent">Sent</option><option value="accepted">Accepted</option><option value="declined">Declined</option></select></div>
+            <div></div>
+            <div class="span4"><label>Notes (printed on the quote)</label><textarea id="q_notes" rows="2"></textarea></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Event schedule</h3>
+          <p class="hint">The calls everyone works. Crew lines use this schedule unless you untick "Same as event schedule" on a line. A call that ends past midnight bills the after-midnight hours at double time.</p>
+          <div id="scheduleRows"></div>
+          <button class="secondary" onclick="addScheduleRow()">+ Add call</button>
+        </div>
+
+        <h3 style="margin:1.25rem 0 0.6rem">Crew</h3>
+        <div id="lines"></div>
+        <div class="bar"><button class="secondary" onclick="addLine()">+ Add crew line</button></div>
+      </div>
+
+      <div class="summary">
+        <div class="card">
+          <h3>Quote total</h3>
+          <table id="summaryTable"></table>
+          <div class="bar" style="margin:1rem 0 0">
+            <button class="primary" id="saveBtn" onclick="saveQuote()">Save</button>
+            <button class="secondary" onclick="printQuote()">Print / PDF</button>
+          </div>
+          <div class="bar" style="margin:0.5rem 0 0">
+            <button class="link" onclick="duplicateQuote()" id="dupBtn">Duplicate</button>
+            <button class="link danger" onclick="deleteQuote()" id="delBtn">Delete</button>
+            <span id="saveMsg" class="ok"></span>
+          </div>
+          <p id="editErr" class="error"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Rates & settings ===== -->
+  <div id="tab-rates" class="hidden">
+    <div class="card">
+      <h3>Settings</h3>
+      <p class="hint">Changing these affects new numbers on every quote the next time it's opened. The bill rate on a new crew line is pay rate × markup.</p>
+      <div class="grid field" id="settingsForm"></div>
+      <div class="bar" style="margin-top:1rem"><button class="primary" onclick="saveSettings()">Save settings</button><span id="settingsMsg" class="ok"></span></div>
+    </div>
+    <div class="card table-wrap">
+      <h3>Pay rates</h3>
+      <p class="hint">Crew pay per craft (from the 2027 time sheet's Pay Rate tab). Day-rate crafts bill per call instead of per hour.</p>
+      <table class="rates-table">
+        <thead><tr><th>Craft</th><th style="width:120px">Pay rate</th><th style="width:110px">Per</th><th style="width:110px" class="num">Bill rate</th><th style="width:70px"></th></tr></thead>
+        <tbody id="ratesBody"></tbody>
+        <tfoot><tr>
+          <td><input id="newJob" placeholder="New craft"></td>
+          <td><input id="newPay" type="number" step="0.01" placeholder="0.00"></td>
+          <td><select id="newUnit"><option value="hour">Hour</option><option value="day">Day</option></select></td>
+          <td></td>
+          <td><button class="secondary" onclick="addRate()">Add</button></td>
+        </tr></tfoot>
+      </table>
+      <p id="ratesErr" class="error"></p>
+    </div>
+  </div>
+</main>
+
+<div id="printDoc"></div>
+<datalist id="craftList"></datalist>
+
+<script src="/js/quote-calc.js"></script>
+<script>
+let config = { settings: {}, rates: [] };
+let quotes = [];
+let cur = null; // quote being edited
+let dirty = false;
+
+const $ = id => document.getElementById(id);
+const money = n => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const hrs = n => (Math.round((Number(n) || 0) * 100) / 100).toString();
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtDate = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return ((h % 12) || 12) + ':' + String(m).padStart(2, '0') + (h < 12 ? 'a' : 'p'); };
+
+async function api(url, opts = {}) {
+  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  if (res.status === 401) { location.href = '/admin-login.html'; throw new Error('Login required'); }
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || 'Request failed');
+  return j;
+}
+
+async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); location.href = '/admin-login.html'; }
+
+function showTab(name) {
+  if (name !== 'edit' && dirty && !confirm('You have unsaved changes on this quote. Leave anyway?')) return;
+  if (name !== 'edit') dirty = false;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  ['list', 'edit', 'rates'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== name));
+  if (name === 'list') loadList();
+  if (name === 'rates') renderRates();
+  if (name === 'edit' && !cur) newQuote();
+}
+
+// ---------- List ----------
+async function loadList() {
+  quotes = await api('/api/quotes');
+  renderList();
+}
+
+function renderList() {
+  const f = $('listFilter').value.trim().toLowerCase();
+  const rows = quotes.filter(q => !f || [q.client, q.event_name, q.venue, q.location_city].join(' ').toLowerCase().includes(f));
+  $('quoteList').innerHTML = rows.length ? rows.map(q => `
+    <tr class="click" onclick="openQuote(${q.id})">
+      <td>${esc(q.client) || '<span class="hint">—</span>'}</td>
+      <td>${esc(q.event_name)}</td>
+      <td>${esc(q.location_city)}</td>
+      <td>${fmtDate(q.start_date)}${q.end_date && q.end_date !== q.start_date ? ' – ' + fmtDate(q.end_date) : ''}</td>
+      <td><span class="badge ${esc(q.status)}">${esc(q.status)}</span></td>
+      <td class="num">${money(q.total)}</td>
+      <td>${new Date(q.updated_at.replace(' ', 'T') + 'Z').toLocaleDateString()}</td>
+    </tr>`).join('') : `<tr><td colspan="7" class="hint">${quotes.length ? 'No quotes match.' : 'No quotes yet. Click "+ New Quote" to start one.'}</td></tr>`;
+}
+
+// ---------- Editor ----------
+function blankLine() {
+  return { craft: '', qty: 1, rate: 0, unit: 'hour', use_schedule: true, shifts: [], nights: 0, perdiem_days: 0, travel_from: '', rt_miles: 0 };
+}
+
+function newQuote() {
+  if (dirty && !confirm('Discard unsaved changes?')) return;
+  cur = { id: null, client: '', event_name: '', venue: '', location_city: '', start_date: '', end_date: '', status: 'draft', notes: '',
+    data: { schedule: [{ date: '', in: '08:00', out: '17:00' }], lines: [blankLine()], payroll_fee_pct: config.settings.payroll_fee_pct, include_expenses: true } };
+  dirty = false;
+  renderEditor();
+  switchToEdit();
+}
+
+async function openQuote(id) {
+  cur = await api('/api/quotes/' + id);
+  dirty = false;
+  renderEditor();
+  switchToEdit();
+}
+
+function switchToEdit() {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === 'edit'));
+  ['list', 'edit', 'rates'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== 'edit'));
+}
+
+const HEAD_FIELDS = ['client', 'event_name', 'venue', 'location_city', 'start_date', 'end_date', 'status', 'notes'];
+
+function renderEditor() {
+  $('editTitle').textContent = cur.id ? `Quote #${cur.id}` : 'New Quote';
+  $('editTabBtn').textContent = cur.id ? `Quote #${cur.id}` : 'New Quote';
+  $('dupBtn').classList.toggle('hidden', !cur.id);
+  $('delBtn').classList.toggle('hidden', !cur.id);
+  $('saveMsg').textContent = ''; $('editErr').textContent = '';
+  for (const f of HEAD_FIELDS) {
+    const el = $('q_' + f);
+    el.value = cur[f] || (f === 'status' ? 'draft' : '');
+    el.oninput = () => { cur[f] = el.value; markDirty(); if (f === 'location_city') renderSummary(); };
+  }
+  renderSchedule();
+  renderLines();
+}
+
+function markDirty() { dirty = true; $('saveMsg').textContent = ''; }
+
+function shiftRowHtml(sh, prefix, i) {
+  return `<div class="shift-row">
+    <input type="date" value="${esc(sh.date)}" data-k="date" data-i="${i}" data-p="${prefix}">
+    <input type="time" value="${esc(sh.in)}" data-k="in" data-i="${i}" data-p="${prefix}" title="In">
+    <input type="time" value="${esc(sh.out)}" data-k="out" data-i="${i}" data-p="${prefix}" title="Out">
+    <button class="link danger" data-del="${i}" data-p="${prefix}">Remove</button>
+  </div>`;
+}
+
+function renderSchedule() {
+  const sched = cur.data.schedule;
+  $('scheduleRows').innerHTML = (sched.length ? `<div class="shift-row hint" style="margin:0"><span>Date</span><span>In</span><span>Out</span><span></span></div>` : '')
+    + sched.map((sh, i) => shiftRowHtml(sh, 's', i)).join('');
+  bindShiftInputs($('scheduleRows'), () => cur.data.schedule, () => { syncScheduleToLines(); recalc(); }, renderSchedule);
+}
+
+function addScheduleRow() {
+  const sched = cur.data.schedule;
+  const last = sched[sched.length - 1];
+  let date = '';
+  if (last && last.date) { const d = new Date(last.date + 'T12:00:00'); d.setDate(d.getDate() + 1); date = d.toISOString().slice(0, 10); }
+  else if (!last && cur.start_date) date = cur.start_date;
+  sched.push({ date, in: last ? last.in : '08:00', out: last ? last.out : '17:00' });
+  markDirty(); renderSchedule(); syncScheduleToLines(); renderLines();
+}
+
+function syncScheduleToLines() {
+  for (const l of cur.data.lines) if (l.use_schedule) l.shifts = cur.data.schedule.map(s => ({ ...s }));
+}
+
+function bindShiftInputs(container, getList, onChange, rerender) {
+  container.querySelectorAll('input[data-k]').forEach(inp => {
+    inp.oninput = () => { getList()[inp.dataset.i][inp.dataset.k] = inp.value; markDirty(); onChange(); };
+  });
+  container.querySelectorAll('button[data-del]').forEach(b => {
+    b.onclick = () => { getList().splice(Number(b.dataset.del), 1); markDirty(); rerender(); onChange(); };
+  });
+}
+
+function defaultRate(craft) {
+  const r = config.rates.find(r => r.job.toLowerCase() === String(craft).trim().toLowerCase());
+  if (!r) return null;
+  return { rate: Math.round(r.pay_rate * config.settings.markup * 100) / 100, unit: r.unit };
+}
+
+function renderLines() {
+  syncScheduleToLines();
+  const box = $('lines');
+  box.innerHTML = cur.data.lines.map((l, i) => `
+    <div class="line" data-line="${i}">
+      <div class="line-top">
+        <div><label>Craft</label><input class="inp" list="craftList" data-f="craft" value="${esc(l.craft)}" placeholder="Pick or type a craft"></div>
+        <div><label>Qty</label><input class="inp" type="number" min="0" step="1" data-f="qty" value="${l.qty}"></div>
+        <div><label>Bill rate</label><input class="inp" type="number" min="0" step="0.01" data-f="rate" value="${l.rate}"></div>
+        <div><label>Per</label><select class="inp" data-f="unit"><option value="hour"${l.unit === 'hour' ? ' selected' : ''}>Hour</option><option value="day"${l.unit === 'day' ? ' selected' : ''}>Day</option></select></div>
+        <div><button class="link" data-act="dup">Copy</button> &nbsp;<button class="link danger" data-act="del">Remove</button></div>
+      </div>
+      <div class="line-mid">
+        <div><label>Hotel nights</label><input class="inp" type="number" min="0" step="1" data-f="nights" value="${l.nights}"></div>
+        <div><label>Per diem days</label><input class="inp" type="number" min="0" step="1" data-f="perdiem_days" value="${l.perdiem_days}"></div>
+        <div><label>Crew traveling from</label><input class="inp" data-f="travel_from" value="${esc(l.travel_from)}" placeholder="City, ST (blank = local)"></div>
+        <div><label>Round-trip miles</label><input class="inp" type="number" min="0" step="1" data-f="rt_miles" value="${l.rt_miles}"></div>
+        <div>${config.mapsEnabled ? `<button class="secondary" data-act="miles" title="Look up driving distance from the location city">Look up</button>` : ''}</div>
+      </div>
+      <div class="line-shifts">
+        <label style="display:inline-flex;gap:0.4rem;align-items:center;font-weight:400;color:var(--navy);font-size:0.85rem">
+          <input type="checkbox" data-f="use_schedule"${l.use_schedule ? ' checked' : ''}> Same as event schedule
+        </label>
+        <div class="line-shift-rows">${l.use_schedule ? '' : l.shifts.map((sh, j) => shiftRowHtml(sh, 'l' + i, j)).join('') + `<button class="link" data-act="addshift">+ Add call</button>`}</div>
+      </div>
+      <div class="line-calc" data-calc></div>
+    </div>`).join('');
+
+  box.querySelectorAll('.line').forEach(el => {
+    const i = Number(el.dataset.line), l = cur.data.lines[i];
+    el.querySelectorAll('[data-f]').forEach(inp => {
+      const f = inp.dataset.f;
+      inp.addEventListener(inp.type === 'checkbox' || inp.tagName === 'SELECT' ? 'change' : 'input', () => {
+        if (f === 'use_schedule') {
+          l.use_schedule = inp.checked;
+          if (!l.use_schedule) l.shifts = cur.data.schedule.map(s => ({ ...s }));
+          markDirty(); renderLines(); return;
+        }
+        l[f] = ['qty', 'rate', 'nights', 'perdiem_days', 'rt_miles'].includes(f) ? (inp.value === '' ? 0 : Number(inp.value)) : inp.value;
+        if (f === 'craft') {
+          const d = defaultRate(inp.value);
+          if (d) { l.rate = d.rate; l.unit = d.unit; el.querySelector('[data-f=rate]').value = d.rate; el.querySelector('[data-f=unit]').value = d.unit; }
+        }
+        markDirty(); recalc();
+      });
+    });
+    const rows = el.querySelector('.line-shift-rows');
+    if (!l.use_schedule) bindShiftInputs(rows, () => l.shifts, recalc, renderLines);
+    el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => lineAction(b.dataset.act, i, b));
+  });
+  recalc();
+}
+
+async function lineAction(act, i, btn) {
+  const lines = cur.data.lines;
+  if (act === 'del') { lines.splice(i, 1); }
+  else if (act === 'dup') { lines.splice(i + 1, 0, JSON.parse(JSON.stringify(lines[i]))); }
+  else if (act === 'addshift') {
+    const s = lines[i].shifts, last = s[s.length - 1];
+    s.push({ date: '', in: last ? last.in : '08:00', out: last ? last.out : '17:00' });
+  } else if (act === 'miles') {
+    const l = lines[i];
+    if (!cur.location_city || !l.travel_from) { alert('Fill in the location city at the top and where this crew is traveling from.'); return; }
+    btn.disabled = true; btn.textContent = '…';
+    try {
+      const r = await api(`/api/quotes/distance?origin=${encodeURIComponent(cur.location_city)}&destination=${encodeURIComponent(l.travel_from)}`);
+      l.rt_miles = r.roundTrip;
+    } catch (e) { alert(e.message); }
+  }
+  markDirty(); renderLines();
+}
+
+function addLine() {
+  cur.data.lines.push(blankLine());
+  markDirty(); renderLines();
+  const all = document.querySelectorAll('#lines .line');
+  all[all.length - 1].querySelector('[data-f=craft]').focus();
+}
+
+function recalc() {
+  syncScheduleToLines();
+  const t = QuoteCalc.calcQuote(cur.data, config.settings);
+  document.querySelectorAll('#lines .line').forEach((el, i) => {
+    const c = t.lines[i], l = cur.data.lines[i];
+    const bits = l.unit === 'day'
+      ? [`<span><b>${c.shiftCount}</b> day${c.shiftCount === 1 ? '' : 's'} × ${c.qty}</span>`]
+      : [`<span>Reg <b>${hrs(c.regHours)}</b>h</span>`, c.otHours ? `<span>OT <b>${hrs(c.otHours)}</b>h</span>` : '', c.dtHours ? `<span>DT <b>${hrs(c.dtHours)}</b>h</span>` : '', `<span>× ${c.qty}</span>`];
+    bits.push(`<span>Labor <b>${money(c.labor)}</b></span>`);
+    if (c.expenses) bits.push(`<span>Expenses <b>${money(c.expenses)}</b></span>`);
+    bits.push(`<span class="total">${money(c.labor + c.expenses)}</span>`);
+    el.querySelector('[data-calc]').innerHTML = bits.join('');
+  });
+  renderSummary(t);
+}
+
+function renderSummary(t) {
+  t = t || QuoteCalc.calcQuote(cur.data, config.settings);
+  const row = (label, val, cls = '') => `<tr class="${cls}"><td>${label}</td><td>${val}</td></tr>`;
+  $('summaryTable').innerHTML =
+    row('Crew', t.people) +
+    row('Regular', money(t.reg)) +
+    (t.ot ? row('Overtime (1.5×)', money(t.ot)) : '') +
+    (t.dtPay ? row('Double time (2×)', money(t.dtPay)) : '') +
+    row('Labor subtotal', money(t.laborSubtotal), 'sep') +
+    row(`Payroll fee <input type="number" id="feePct" min="0" step="0.5" value="${t.payrollFeePct}">%`, money(t.payrollFee)) +
+    row('<b>Total labor</b>', `<b>${money(t.totalLabor)}</b>`, 'sep') +
+    row('Hotel', money(t.hotel)) + row('Per diem', money(t.perDiem)) + row('Mileage', money(t.travel)) +
+    row(`<label style="display:inline-flex;gap:0.35rem;align-items:center"><input type="checkbox" id="inclExp"${t.includeExpenses ? ' checked' : ''}> Bill expenses</label>`, money(t.expenses), 'sep') +
+    row('Total', money(t.total), 'grand');
+  $('feePct').oninput = e => { cur.data.payroll_fee_pct = e.target.value === '' ? null : Number(e.target.value); markDirty(); recalcKeepFocus('feePct'); };
+  $('inclExp').onchange = e => { cur.data.include_expenses = e.target.checked; markDirty(); recalc(); };
+}
+
+function recalcKeepFocus(id) {
+  const el = $(id), pos = el.selectionStart;
+  recalc();
+  const n = $(id); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { /* number inputs */ }
+}
+
+function payload() {
+  syncScheduleToLines();
+  const p = { data: cur.data };
+  for (const f of HEAD_FIELDS) p[f] = cur[f];
+  return p;
+}
+
+async function saveQuote() {
+  $('editErr').textContent = '';
+  $('saveBtn').disabled = true;
+  try {
+    const saved = cur.id
+      ? await api('/api/quotes/' + cur.id, { method: 'PUT', body: payload() })
+      : await api('/api/quotes', { method: 'POST', body: payload() });
+    const wasNew = !cur.id;
+    cur = saved; dirty = false;
+    if (wasNew) renderEditor(); else { $('editTitle').textContent = `Quote #${cur.id}`; }
+    $('saveMsg').textContent = 'Saved';
+  } catch (e) { $('editErr').textContent = e.message; }
+  finally { $('saveBtn').disabled = false; }
+}
+
+function duplicateQuote() {
+  if (dirty && !confirm('Duplicate without saving your changes to this quote first?')) return;
+  const copy = JSON.parse(JSON.stringify(cur));
+  copy.id = null; copy.status = 'draft';
+  copy.event_name = (copy.event_name || '') + ' (copy)';
+  cur = copy; dirty = true;
+  renderEditor();
+  $('saveMsg').textContent = 'Copy — not saved yet';
+}
+
+async function deleteQuote() {
+  if (!cur.id || !confirm(`Delete quote #${cur.id}? This can't be undone.`)) return;
+  await api('/api/quotes/' + cur.id, { method: 'DELETE' });
+  cur = null; dirty = false;
+  showTab('list');
+}
+
+function printQuote() {
+  syncScheduleToLines();
+  const t = QuoteCalc.calcQuote(cur.data, config.settings);
+  const dates = fmtDate(cur.start_date) + (cur.end_date && cur.end_date !== cur.start_date ? ' – ' + fmtDate(cur.end_date) : '');
+  const lineRows = cur.data.lines.map((l, i) => {
+    const c = t.lines[i];
+    const hoursCell = l.unit === 'day' ? `${c.shiftCount} day${c.shiftCount === 1 ? '' : 's'}`
+      : hrs(c.regHours) + (c.otHours ? ` + ${hrs(c.otHours)} OT` : '') + (c.dtHours ? ` + ${hrs(c.dtHours)} DT` : '');
+    return `<tr><td>${esc(l.craft)}</td><td class="num">${c.qty}</td><td class="num">${hoursCell}</td><td class="num">${money(l.rate)}/${l.unit === 'day' ? 'day' : 'hr'}</td><td class="num">${money(c.labor)}</td></tr>`;
+  }).join('');
+  const sched = cur.data.schedule.filter(s => s.in && s.out)
+    .map(s => `${s.date ? fmtDate(s.date) + ' ' : ''}${fmtTime(s.in)}–${fmtTime(s.out)}`).join(' &nbsp;·&nbsp; ');
+  const tot = (label, val, cls = 'tot') => `<tr class="${cls}"><td colspan="4" class="num">${label}</td><td class="num">${val}</td></tr>`;
+  $('printDoc').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18pt">
+      <div><h1>O Double G LLC</h1><div>Event Staffing Quote</div></div>
+      <div style="text-align:right">${cur.id ? `Quote #${cur.id}<br>` : ''}${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+    </div>
+    <table style="margin-bottom:14pt"><tr>
+      <td style="border:none;vertical-align:top;width:50%"><b>Client</b><br>${esc(cur.client)}</td>
+      <td style="border:none;vertical-align:top"><b>Event</b><br>${esc(cur.event_name)}${cur.venue ? '<br>' + esc(cur.venue) : ''}${cur.location_city ? '<br>' + esc(cur.location_city) : ''}${dates ? '<br>' + dates : ''}</td>
+    </tr></table>
+    ${sched ? `<p><b>Schedule:</b> ${sched}</p>` : ''}
+    <table>
+      <thead><tr><th style="text-align:left">Craft</th><th class="num">Qty</th><th class="num">Hours each</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+      <tbody>${lineRows}</tbody>
+      <tbody>
+        ${tot('Labor subtotal', money(t.laborSubtotal))}
+        ${tot(`Payroll fee (${t.payrollFeePct}%)`, money(t.payrollFee))}
+        ${tot('Total labor', money(t.totalLabor))}
+        ${t.includeExpenses && t.hotel ? tot('Hotel', money(t.hotel)) : ''}
+        ${t.includeExpenses && t.perDiem ? tot('Per diem', money(t.perDiem)) : ''}
+        ${t.includeExpenses && t.travel ? tot('Mileage', money(t.travel)) : ''}
+        ${tot('Total', money(t.total), 'grand')}
+      </tbody>
+    </table>
+    ${cur.notes ? `<p style="margin-top:14pt;white-space:pre-wrap">${esc(cur.notes)}</p>` : ''}
+    <p style="margin-top:18pt;font-size:9pt;color:#555">Overtime is billed at 1.5× after ${config.settings.ot_threshold} hours per person; hours after midnight are billed at 2×. Final invoice is based on actual hours worked.</p>`;
+  window.print();
+}
+
+// ---------- Rates & settings ----------
+const SETTING_LABELS = {
+  markup: 'Markup (bill = pay ×)', payroll_fee_pct: 'Payroll fee %', hotel_rate: 'Hotel per night $', per_diem_rate: 'Per diem per day $',
+  mileage_rate: 'Mileage $ per mile', ot_threshold: 'OT after (hours)', ot_multiplier: 'OT multiplier', dt_multiplier: 'Double-time multiplier',
+};
+
+function renderRates() {
+  $('settingsForm').innerHTML = Object.entries(SETTING_LABELS).map(([k, label]) =>
+    `<div><label>${label}</label><input type="number" step="any" min="0" id="set_${k}" value="${config.settings[k]}"></div>`).join('');
+  $('ratesBody').innerHTML = config.rates.map(r => `
+    <tr data-id="${r.id}">
+      <td><input data-f="job" value="${esc(r.job)}"></td>
+      <td><input data-f="pay_rate" type="number" step="0.001" value="${r.pay_rate}"></td>
+      <td><select data-f="unit"><option value="hour"${r.unit === 'hour' ? ' selected' : ''}>Hour</option><option value="day"${r.unit === 'day' ? ' selected' : ''}>Day</option></select></td>
+      <td class="num">${money(r.pay_rate * config.settings.markup)}</td>
+      <td><button class="link danger" data-del>Delete</button></td>
+    </tr>`).join('');
+  $('ratesBody').querySelectorAll('tr').forEach(tr => {
+    const id = tr.dataset.id;
+    tr.querySelectorAll('[data-f]').forEach(inp => inp.onchange = async () => {
+      $('ratesErr').textContent = '';
+      try {
+        const r = await api('/api/quotes/rates/' + id, { method: 'PUT', body: { [inp.dataset.f]: inp.value } });
+        Object.assign(config.rates.find(x => x.id == id), r);
+        tr.children[3].textContent = money(r.pay_rate * config.settings.markup);
+        renderCraftList();
+      } catch (e) { $('ratesErr').textContent = e.message; }
+    });
+    tr.querySelector('[data-del]').onclick = async () => {
+      if (!confirm('Remove this craft from the rate list? Existing quotes keep their rates.')) return;
+      await api('/api/quotes/rates/' + id, { method: 'DELETE' });
+      config.rates = config.rates.filter(x => x.id != id);
+      renderRates(); renderCraftList();
+    };
+  });
+}
+
+async function addRate() {
+  $('ratesErr').textContent = '';
+  try {
+    const r = await api('/api/quotes/rates', { method: 'POST', body: { job: $('newJob').value, pay_rate: $('newPay').value, unit: $('newUnit').value } });
+    config.rates.push(r);
+    config.rates.sort((a, b) => a.job.localeCompare(b.job));
+    $('newJob').value = ''; $('newPay').value = '';
+    renderRates(); renderCraftList();
+  } catch (e) { $('ratesErr').textContent = e.message; }
+}
+
+async function saveSettings() {
+  const body = {};
+  for (const k of Object.keys(SETTING_LABELS)) body[k] = $('set_' + k).value;
+  const r = await api('/api/quotes/settings', { method: 'PUT', body });
+  config.settings = r.settings;
+  renderRates();
+  $('settingsMsg').textContent = 'Saved';
+  setTimeout(() => $('settingsMsg').textContent = '', 2500);
+}
+
+function renderCraftList() {
+  $('craftList').innerHTML = config.rates.map(r => `<option value="${esc(r.job)}">`).join('');
+}
+
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+(async function init() {
+  const me = await (await fetch('/api/auth/me')).json();
+  if (me.role !== 'admin') { location.href = '/admin-login.html'; return; }
+  config = await api('/api/quotes/config');
+  renderCraftList();
+  loadList();
+})();
+</script>
+</body>
+</html>
