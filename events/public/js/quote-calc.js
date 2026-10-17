@@ -3,8 +3,10 @@
 // the saved totals always match what was on screen.
 //
 // Per person on a line (multiplied by the line's qty):
-//   - each shift's hours up to midnight are regular; the part after midnight
-//     (a shift whose out time is earlier than its in time) is double time
+//   - after-hours double time by the quote's dt_mode: "midnight" (the
+//     workbook's rule) = the part of a call after midnight, for calls whose
+//     out time is earlier than their in time; "window" = any hours worked
+//     inside dt_start..dt_end (e.g. 00:00-08:00, may wrap past midnight)
 //   - overtime (1.5x) by the quote's ot_mode: "weekly" = regular hours past
 //     ot_threshold (40) across the line, "daily" = hours past the daily
 //     threshold within each call, "both" = daily first, then weekly on the
@@ -23,22 +25,39 @@
 
   function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
 
-  function calcLine(line, s, ot) {
+  // Double-time hours inside a call running from i to o (hours, o may be > 24)
+  function dtHoursIn(i, o, rule) {
+    if (rule.mode !== 'window') return Math.max(0, o - Math.max(i, 24));
+    const ws = rule.start, we = rule.end > rule.start ? rule.end : rule.end + 24;
+    if (we === ws) return 0;
+    let total = 0;
+    for (let k = -1; k <= 1; k++) {
+      const a = ws + 24 * k, b = we + 24 * k;
+      total += Math.max(0, Math.min(o, b) - Math.max(i, a));
+    }
+    return total;
+  }
+
+  function calcLine(line, s, ot, dtRule) {
     const qty = Math.max(0, Number(line.qty) || 0);
     const rate = Number(line.rate) || 0;
     const shifts = (line.shifts || []).filter(sh => toHours(sh.in) != null && toHours(sh.out) != null);
     const daily = ot.mode === 'daily' || ot.mode === 'both';
     const weekly = ot.mode !== 'daily';
     let straight = 0, dailyOt = 0, dt = 0;
+    const shiftDetail = [];
     for (const sh of shifts) {
-      const i = toHours(sh.in), o = toHours(sh.out);
-      let h;
-      if (o >= i) h = o - i;
-      else { h = 24 - i; dt += o; }
+      const i = toHours(sh.in);
+      let o = toHours(sh.out);
+      if (o < i) o += 24;
+      const shDt = dtHoursIn(i, o, dtRule);
+      let h = o - i - shDt;
+      dt += shDt;
+      shiftDetail.push({ date: sh.date, in: sh.in, out: sh.out, hours: round2(o - i), dtHours: round2(shDt) });
       if (daily && h > ot.dailyHours) { dailyOt += h - ot.dailyHours; h = ot.dailyHours; }
       straight += h;
     }
-    const out = { qty, rate, shiftCount: shifts.length, regHours: 0, otHours: 0, dtHours: 0, reg: 0, ot: 0, dtPay: 0 };
+    const out = { shiftDetail, qty, rate, shiftCount: shifts.length, regHours: 0, otHours: 0, dtHours: 0, reg: 0, ot: 0, dtPay: 0 };
     if (line.unit === 'day') {
       out.reg = rate * shifts.length * qty;
     } else {
@@ -64,14 +83,23 @@
     return { mode, dailyHours: quote.daily_ot_hours != null && quote.daily_ot_hours !== '' && dh > 0 ? dh : s.daily_ot_threshold };
   }
 
-  // quote: { lines, payroll_fee_pct, include_expenses, ot_mode, daily_ot_hours }, s: settings object
+  function dtRuleFor(quote, s) {
+    const mode = quote.dt_mode === 'window' ? 'window' : 'midnight';
+    const start = toHours(quote.dt_start) ?? s.dt_window_start;
+    const end = toHours(quote.dt_end) ?? s.dt_window_end;
+    return { mode, start, end };
+  }
+
+  // quote: { lines, payroll_fee_pct, include_expenses, ot_mode, daily_ot_hours, dt_mode, dt_start, dt_end }
+  // s: settings object
   function calcQuote(quote, s) {
     const ot = otRule(quote, s);
-    const lines = (quote.lines || []).map(l => calcLine(l, s, ot));
+    const dtRule = dtRuleFor(quote, s);
+    const lines = (quote.lines || []).map(l => calcLine(l, s, ot, dtRule));
     const sum = k => round2(lines.reduce((a, l) => a + l[k], 0));
     const t = {
       lines,
-      otMode: ot.mode, dailyOtHours: ot.dailyHours,
+      otMode: ot.mode, dailyOtHours: ot.dailyHours, dtRule,
       people: lines.reduce((a, l) => a + l.qty, 0),
       reg: sum('reg'), ot: sum('ot'), dtPay: sum('dtPay'),
       hotel: sum('hotel'), perDiem: sum('perDiem'), travel: sum('travel'),
@@ -87,7 +115,10 @@
     return t;
   }
 
-  const api = { calcLine, calcQuote, toHours };
+  // bill rate from crew pay: pay + markup %
+  function billRate(pay, s) { return round2(pay * (1 + s.markup_pct / 100)); }
+
+  const api = { calcLine, calcQuote, toHours, billRate };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.QuoteCalc = api;
 })(this);
