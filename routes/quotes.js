@@ -2,7 +2,7 @@
 // "2027 time sheet.xlsm" workbook. Admin only.
 //
 // quote_rates is the workbook's Pay Rate sheet (crew pay per craft; the bill
-// rate on a quote defaults to pay x markup). quote_settings holds the other
+// rate on a quote defaults to pay + markup %). quote_settings holds the other
 // numbers the workbook hard-coded (hotel, per diem, mileage, payroll fee...).
 // Mileage comes from Google's Distance Matrix like the workbook's
 // GetRoundTripMileage macro, cached in quote_distances.
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS quotes (
 `);
 
 const DEFAULT_SETTINGS = {
-  markup: 1.35,          // bill rate = pay rate x markup
+  markup_pct: 35,        // bill rate = pay rate + this %
   payroll_fee_pct: 35,
   hotel_rate: 115,
   per_diem_rate: 68,
@@ -66,6 +66,8 @@ const DEFAULT_SETTINGS = {
   daily_ot_threshold: 8, // daily OT after this many hours in a call (when a quote uses daily OT)
   ot_multiplier: 1.5,
   dt_multiplier: 2,
+  dt_window_start: 0,    // hour of day; used when a quote bills DT by time window
+  dt_window_end: 8,
 };
 
 // Pay Rate sheet as of the 2027 workbook
@@ -85,6 +87,13 @@ const SEED_RATES = [
 ];
 
 {
+  // markup used to be stored as a multiplier (1.35); it's a percentage now
+  const oldMarkup = db.prepare("SELECT value FROM quote_settings WHERE key = 'markup'").get();
+  if (oldMarkup) {
+    db.prepare("INSERT OR IGNORE INTO quote_settings (key, value) VALUES ('markup_pct', ?)")
+      .run(String(Math.round((Number(oldMarkup.value) - 1) * 10000) / 100));
+    db.prepare("DELETE FROM quote_settings WHERE key = 'markup'").run();
+  }
   const insSetting = db.prepare('INSERT OR IGNORE INTO quote_settings (key, value) VALUES (?, ?)');
   for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insSetting.run(k, String(v));
   if (db.prepare('SELECT COUNT(*) AS c FROM quote_rates').get().c === 0) {
@@ -129,6 +138,9 @@ function cleanData(data) {
     payroll_fee_pct: d.payroll_fee_pct === '' || d.payroll_fee_pct == null ? null : Number(d.payroll_fee_pct),
     include_expenses: d.include_expenses !== false,
     ot_mode: ['weekly', 'daily', 'both'].includes(d.ot_mode) ? d.ot_mode : 'weekly',
+    dt_mode: d.dt_mode === 'window' ? 'window' : 'midnight',
+    dt_start: /^\d{2}:\d{2}$/.test(d.dt_start || '') ? d.dt_start : null,
+    dt_end: /^\d{2}:\d{2}$/.test(d.dt_end || '') ? d.dt_end : null,
     daily_ot_hours: d.daily_ot_hours === '' || d.daily_ot_hours == null ? null : Number(d.daily_ot_hours) || null,
   };
 }

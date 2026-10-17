@@ -48,6 +48,10 @@
   #quoteList tr.click:hover td { background: #faf7f0; }
   .rates-table input, .rates-table select { padding: 0.3rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.88rem; width: 100%; }
   #printDoc { display: none; }
+  .dt-rule label { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.9rem; margin: 0.35rem 0; }
+  .dt-rule input[type=time] { padding: 0.3rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.88rem; }
+  #dtDetail table td, #dtDetail table th { font-size: 0.85rem; padding: 0.4rem; }
+  #dtDetail .tot td { font-weight: 700; border-top: 2px solid var(--navy); }
   @media (max-width: 900px) {
     .layout { grid-template-columns: 1fr; }
     .summary { position: static; }
@@ -123,9 +127,20 @@
 
         <div class="card">
           <h3>Event schedule</h3>
-          <p class="hint">The calls everyone works. Crew lines use this schedule unless you untick "Same as event schedule" on a line. A call that ends past midnight bills the after-midnight hours at double time.</p>
+          <p class="hint">The calls everyone works. Crew lines use this schedule unless you untick "Same as event schedule" on a line. Double-time hours are set in the next section.</p>
           <div id="scheduleRows"></div>
           <button class="secondary" onclick="addScheduleRow()">+ Add call</button>
+        </div>
+
+        <div class="card">
+          <h3>After-hours double time</h3>
+          <p class="hint">Which hours bill at double time (<span id="dtMultTxt"></span>× the bill rate). Double-time hours don't count toward overtime.</p>
+          <div class="dt-rule">
+            <label><input type="radio" name="dtMode" value="midnight"> After midnight: the hours after 12am on a call that runs past midnight (the time sheet's rule)</label>
+            <label><input type="radio" name="dtMode" value="window"> Time window: any hours worked between
+              <input type="time" id="dtStart"> and <input type="time" id="dtEnd"></label>
+          </div>
+          <div id="dtDetail"></div>
         </div>
 
         <h3 style="margin:1.25rem 0 0.6rem">Crew</h3>
@@ -156,7 +171,7 @@
   <div id="tab-rates" class="hidden">
     <div class="card">
       <h3>Settings</h3>
-      <p class="hint">Changing these affects new numbers on every quote the next time it's opened. The bill rate on a new crew line is pay rate × markup.</p>
+      <p class="hint">Changing these affects new numbers on every quote the next time it's opened. The bill rate on a new crew line is pay rate plus the markup % (e.g. $23.92 + 35% = $32.29).</p>
       <div class="grid field" id="settingsForm"></div>
       <div class="bar" style="margin-top:1rem"><button class="primary" onclick="saveSettings()">Save settings</button><span id="settingsMsg" class="ok"></span></div>
     </div>
@@ -278,7 +293,54 @@ function renderEditor() {
     el.oninput = () => { cur[f] = el.value; markDirty(); if (f === 'location_city') renderSummary(); };
   }
   renderSchedule();
+  renderDtControls();
   renderLines();
+}
+
+const hhmm = h => String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.round((h % 1) * 60)).padStart(2, '0');
+
+function renderDtControls() {
+  const d = cur.data;
+  $('dtMultTxt').textContent = config.settings.dt_multiplier;
+  document.querySelectorAll('input[name=dtMode]').forEach(r => {
+    r.checked = r.value === (d.dt_mode === 'window' ? 'window' : 'midnight');
+    r.onchange = () => { d.dt_mode = r.value; markDirty(); recalc(); };
+  });
+  $('dtStart').value = d.dt_start || hhmm(config.settings.dt_window_start);
+  $('dtEnd').value = d.dt_end || hhmm(config.settings.dt_window_end);
+  for (const [id, k] of [['dtStart', 'dt_start'], ['dtEnd', 'dt_end']]) {
+    $(id).oninput = () => { d[k] = $(id).value; if (d.dt_mode !== 'window') { d.dt_mode = 'window'; renderDtControls(); } markDirty(); recalc(); };
+  }
+}
+
+// Every call with double-time hours: craft, call, qty, DT hours and amount
+function dtRows(t) {
+  const rows = [];
+  cur.data.lines.forEach((l, i) => {
+    if (l.unit === 'day') return;
+    const c = t.lines[i], dtRate = (Number(l.rate) || 0) * config.settings.dt_multiplier;
+    for (const sh of c.shiftDetail) {
+      if (!sh.dtHours) continue;
+      rows.push({ craft: l.craft, date: sh.date, call: `${fmtTime(sh.in)}–${fmtTime(sh.out)}`, qty: c.qty,
+        dtHours: sh.dtHours, dtRate, amount: Math.round(sh.dtHours * dtRate * c.qty * 100) / 100 });
+    }
+  });
+  return rows;
+}
+
+function dtRuleText(t) {
+  const r = t.dtRule;
+  return r.mode === 'window' ? `hours worked between ${fmtTime(hhmm(r.start))} and ${fmtTime(hhmm(r.end))}` : 'hours after midnight';
+}
+
+function dtTableHtml(rows) {
+  const total = rows.reduce((a, r) => a + r.amount, 0), hoursTotal = rows.reduce((a, r) => a + r.dtHours * r.qty, 0);
+  return `<table>
+    <thead><tr><th>Craft</th><th>Date</th><th>Call</th><th class="num">Qty</th><th class="num">DT hrs each</th><th class="num">DT rate</th><th class="num">Amount</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td>${esc(r.craft)}</td><td>${fmtDate(r.date)}</td><td>${r.call}</td><td class="num">${r.qty}</td>
+      <td class="num">${hrs(r.dtHours)}</td><td class="num">${money(r.dtRate)}/hr</td><td class="num">${money(r.amount)}</td></tr>`).join('')}
+    <tr class="tot"><td colspan="4">Total double time</td><td class="num">${hrs(hoursTotal)} crew-hrs</td><td></td><td class="num">${money(total)}</td></tr></tbody>
+  </table>`;
 }
 
 function markDirty() { dirty = true; $('saveMsg').textContent = ''; }
@@ -325,7 +387,7 @@ function bindShiftInputs(container, getList, onChange, rerender) {
 function defaultRate(craft) {
   const r = config.rates.find(r => r.job.toLowerCase() === String(craft).trim().toLowerCase());
   if (!r) return null;
-  return { rate: Math.round(r.pay_rate * config.settings.markup * 100) / 100, unit: r.unit };
+  return { rate: QuoteCalc.billRate(r.pay_rate, config.settings), unit: r.unit };
 }
 
 function renderLines() {
@@ -420,6 +482,9 @@ function recalc() {
     bits.push(`<span class="total">${money(c.labor + c.expenses)}</span>`);
     el.querySelector('[data-calc]').innerHTML = bits.join('');
   });
+  const rows = dtRows(t);
+  $('dtDetail').innerHTML = rows.length ? `<div class="table-wrap">${dtTableHtml(rows)}</div>`
+    : `<p class="hint" style="margin-top:0.75rem">No calls on this quote fall in double time.</p>`;
   renderSummary(t);
 }
 
@@ -507,6 +572,9 @@ function printQuote() {
   }).join('');
   const sched = cur.data.schedule.filter(s => s.in && s.out)
     .map(s => `${s.date ? fmtDate(s.date) + ' ' : ''}${fmtTime(s.in)}–${fmtTime(s.out)}`).join(' &nbsp;·&nbsp; ');
+  const dtR = dtRows(t);
+  const dtPrint = dtR.length ? `<h3 style="margin:16pt 0 4pt;font-size:12pt">After-hours double time</h3>
+    <p style="margin:0 0 4pt;font-size:10pt">Billed at ${config.settings.dt_multiplier}× for ${dtRuleText(t)}. Included in the labor above.</p>${dtTableHtml(dtR)}` : '';
   const tot = (label, val, cls = 'tot') => `<tr class="${cls}"><td colspan="4" class="num">${label}</td><td class="num">${val}</td></tr>`;
   $('printDoc').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18pt">
@@ -531,8 +599,9 @@ function printQuote() {
         ${tot('Total', money(t.total), 'grand')}
       </tbody>
     </table>
+    ${dtPrint}
     ${cur.notes ? `<p style="margin-top:14pt;white-space:pre-wrap">${esc(cur.notes)}</p>` : ''}
-    <p style="margin-top:18pt;font-size:9pt;color:#555">Overtime is billed at 1.5× ${otText(t)}; hours after midnight are billed at 2×. Final invoice is based on actual hours worked.</p>`;
+    <p style="margin-top:18pt;font-size:9pt;color:#555">Overtime is billed at 1.5× ${otText(t)}; ${dtRuleText(t)} are billed at ${config.settings.dt_multiplier}×. Final invoice is based on actual hours worked.</p>`;
   window.print();
 }
 
@@ -543,8 +612,9 @@ function otText(t) {
 
 // ---------- Rates & settings ----------
 const SETTING_LABELS = {
-  markup: 'Markup (bill = pay ×)', payroll_fee_pct: 'Payroll fee %', hotel_rate: 'Hotel per night $', per_diem_rate: 'Per diem per day $',
+  markup_pct: 'Markup %', payroll_fee_pct: 'Payroll fee %', hotel_rate: 'Hotel per night $', per_diem_rate: 'Per diem per day $',
   mileage_rate: 'Mileage $ per mile', ot_threshold: 'Weekly OT after (hours)', daily_ot_threshold: 'Daily OT after (hours)', ot_multiplier: 'OT multiplier', dt_multiplier: 'Double-time multiplier',
+  dt_window_start: 'DT window starts (hour 0–23)', dt_window_end: 'DT window ends (hour 0–23)',
 };
 
 function renderRates() {
@@ -555,7 +625,7 @@ function renderRates() {
       <td><input data-f="job" value="${esc(r.job)}"></td>
       <td><input data-f="pay_rate" type="number" step="0.001" value="${r.pay_rate}"></td>
       <td><select data-f="unit"><option value="hour"${r.unit === 'hour' ? ' selected' : ''}>Hour</option><option value="day"${r.unit === 'day' ? ' selected' : ''}>Day</option></select></td>
-      <td class="num">${money(r.pay_rate * config.settings.markup)}</td>
+      <td class="num">${money(QuoteCalc.billRate(r.pay_rate, config.settings))}</td>
       <td><button class="link danger" data-del>Delete</button></td>
     </tr>`).join('');
   $('ratesBody').querySelectorAll('tr').forEach(tr => {
@@ -565,7 +635,7 @@ function renderRates() {
       try {
         const r = await api('/api/quotes/rates/' + id, { method: 'PUT', body: { [inp.dataset.f]: inp.value } });
         Object.assign(config.rates.find(x => x.id == id), r);
-        tr.children[3].textContent = money(r.pay_rate * config.settings.markup);
+        tr.children[3].textContent = money(QuoteCalc.billRate(r.pay_rate, config.settings));
         renderCraftList();
       } catch (e) { $('ratesErr').textContent = e.message; }
     });
