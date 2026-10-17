@@ -33,6 +33,7 @@ app.use('/api/applications', require('./routes/applications'));
 app.use('/api/crew', require('./routes/crew'));
 app.use('/api/schedule', require('./routes/schedule'));
 app.use('/api/scholarships', require('./routes/scholarships'));
+app.use('/api/quotes', require('./routes/quotes'));
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
