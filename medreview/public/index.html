@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Medical Record Review</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Medical Record Review</h1>
+    <div class="topbar-actions">
+      <button id="print-btn" class="ghost" type="button">Print</button>
+      <button id="logout-btn" class="ghost" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <p class="disclaimer">
+      This tool uses AI to point out things in your records worth a closer look for <strong>sleep apnea</strong> and
+      <strong>VA disability</strong>. It can miss things or get them wrong, and it is not medical or legal advice.
+      Check anything important against the original document, and take it to your doctor or a VSO / accredited claims agent.
+    </p>
+    <p id="key-warning" class="error" hidden>The analysis service isn't configured on the server yet.</p>
+
+    <section id="drop" class="drop">
+      <input id="file-input" type="file" multiple accept=".pdf,.txt,.jpg,.jpeg,.png,.gif,.webp,application/pdf,text/plain,image/*" hidden>
+      <p class="drop-title">Drop medical documents here</p>
+      <p class="muted">PDF, photos of pages (JPG/PNG), or text files · up to 30 MB each</p>
+      <button id="pick-btn" type="button">Choose files</button>
+      <p id="upload-status" class="muted"></p>
+    </section>
+
+    <section class="panel" id="summary-panel">
+      <div class="panel-head">
+        <h2>Combined review</h2>
+        <button id="summary-btn" type="button">Review all documents together</button>
+      </div>
+      <div id="summary"><p class="muted">After your documents are analyzed, run a combined review to pull everything together: the strongest evidence, possible claims, and what's missing.</p></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Documents</h2>
+        <div class="filters" role="group" aria-label="Show">
+          <button type="button" class="chip active" data-filter="all">All</button>
+          <button type="button" class="chip" data-filter="sleep">Sleep apnea</button>
+          <button type="button" class="chip" data-filter="va">VA</button>
+        </div>
+      </div>
+      <div id="docs"><p class="muted">No documents yet.</p></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
