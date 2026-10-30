@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fair Events Kiosk</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+  /* Options in the URL: ?speed=40 (px/sec) &location=<id> &category=<id> &theme=light &day=YYYY-MM-DD */
+  :root {
+    --bg: #0b1730; --panel: #12284b; --card: #172f57; --ink: #ffffff; --muted: #b6c3da; --gold: #f2a900; --line: #24406e;
+    --now: #1f6b3a; --red: #e0384f;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: clamp(14px, 1.45vw, 30px);
+  }
+  @media (orientation: portrait) { :root { font-size: clamp(14px, 2.6vw, 34px); } }
+  :root[data-theme="light"] { --bg: #f4f1ea; --panel: #12284b; --card: #ffffff; --ink: #1b2330; --muted: #5f6b7a; --line: #e2ddd2; --now: #1d6b35; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); cursor: none; }
+  body { display: flex; flex-direction: column; }
+  header { background: var(--panel); color: #fff; display: flex; align-items: center; gap: 1rem; padding: .9rem 1.6rem; border-bottom: .3rem solid var(--gold); }
+  header img { width: 3rem; height: 3rem; }
+  header h1 { margin: 0; font-size: 1.9rem; line-height: 1.1; }
+  header .date { color: #c9d4e6; font-size: 1.05rem; }
+  header .clock { margin-left: auto; font-size: 2.6rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  .now-band { padding: 1rem 1.6rem .4rem; }
+  .now-band h2, .list-head { margin: 0 0 .6rem; font-size: .95rem; text-transform: uppercase; letter-spacing: .12em; color: var(--gold); }
+  .now-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: .8rem; }
+  .now-card { background: var(--now); color: #fff; border-radius: .8rem; padding: .9rem 1.1rem; }
+  .now-card .t { font-size: 1.35rem; font-weight: 800; line-height: 1.15; }
+  .now-card .w { opacity: .9; margin-top: .25rem; }
+  .now-card .tm { font-size: .9rem; opacity: .85; margin-top: .2rem; font-variant-numeric: tabular-nums; }
+  .viewport { flex: 1; overflow: hidden; position: relative; padding: 0 1.6rem;
+    -webkit-mask-image: linear-gradient(transparent 0, #000 1.6rem, #000 calc(100% - 2.4rem), transparent 100%);
+            mask-image: linear-gradient(transparent 0, #000 1.6rem, #000 calc(100% - 2.4rem), transparent 100%); }
+  .track { will-change: transform; padding-top: 1rem; }
+  .list-head { margin-top: .4rem; }
+  .row { display: grid; grid-template-columns: 9.5rem 1fr auto; gap: 1.2rem; align-items: center; background: var(--card);
+    border-left: .45rem solid var(--cat, var(--muted)); border-radius: .7rem; padding: .85rem 1.2rem; margin-bottom: .6rem; }
+  .row .tm { font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .row .tm small { display: block; font-size: .8rem; font-weight: 500; color: var(--muted); }
+  .row .t { font-size: 1.35rem; font-weight: 700; line-height: 1.2; }
+  .row .w { color: var(--muted); font-size: 1rem; margin-top: .15rem; }
+  .row .cat { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: color-mix(in srgb, var(--cat) 55%, #fff); white-space: nowrap; }
+  :root[data-theme="light"] .row .cat { color: var(--cat); }
+  .row.cancelled .t { text-decoration: line-through; opacity: .7; }
+  .tag { display: inline-block; font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: .12rem .45rem; border-radius: .35rem; margin-right: .4rem; vertical-align: middle; }
+  .tag.cancel { background: var(--red); color: #fff; }
+  .tag.feat { background: var(--gold); color: #12284b; }
+  .day-break { font-size: 1.1rem; font-weight: 800; color: var(--gold); margin: 1.2rem 0 .6rem; text-transform: uppercase; letter-spacing: .1em; }
+  .empty { color: var(--muted); font-size: 1.4rem; text-align: center; padding: 4rem 1rem; }
+  footer { display: flex; justify-content: space-between; padding: .55rem 1.6rem; font-size: .9rem; color: var(--muted); border-top: 1px solid var(--line); }
+  footer b { color: var(--gold); }
+</style>
+</head>
+<body>
+<header>
+  <img src="/icon.svg" alt="">
+  <div>
+    <h1 id="title">Montana State Fair</h1>
+    <div class="date" id="date"></div>
+  </div>
+  <div class="clock" id="clock"></div>
+</header>
+<section class="now-band" id="nowBand" hidden>
+  <h2>Happening now</h2>
+  <div class="now-grid" id="nowGrid"></div>
+</section>
+<div class="viewport" id="viewport"><div class="track" id="track"></div></div>
+<footer><span>Full schedule &amp; map: <b>msf.odoubleg.com</b></span><span id="updated"></span></footer>
+
+<script src="/shared.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const { esc, fmtTime, fmtDay, category, status, where } = MSF;
+  const params = new URLSearchParams(location.search);
+  const theme = params.get('theme');
+  if (theme) document.documentElement.dataset.theme = theme;
+  const fLoc = params.get('location');
+  const fCat = params.get('category');
+  const fixedDay = params.get('day');
+  let speed = Number(params.get('speed')) || 0;
+  let info = null;
+  let html = '';
+  let offset = 0;
+  let loopH = 0;
+  let pauseUntil = 0;
+
+  function filter(list) {
+    return list.filter((e) => (!fLoc || String(e.location_id) === fLoc) && (!fCat || (e.category || 'other') === fCat));
+  }
+
+  function row(e) {
+    const c = category(e.category);
+    return `<div class="row${e.cancelled ? ' cancelled' : ''}" style="--cat:${c.color}">
+      <div class="tm">${fmtTime(e.start_time)}${e.end_time ? `<small>to ${fmtTime(e.end_time)}</small>` : ''}</div>
+      <div><div class="t">${e.cancelled ? '<span class="tag cancel">Cancelled</span>' : ''}${e.featured && !e.cancelled ? '<span class="tag feat">Featured</span>' : ''}${esc(e.title)}</div>
+      <div class="w">${esc(where(e))}</div></div>
+      <div class="cat">${esc(c.label)}</div>
+    </div>`;
+  }
+
+  async function refresh() {
+    try {
+      info = await MSF.api('/api/info');
+      MSF.setNow(info.now);
+      if (!speed) speed = info.kiosk_speed;
+      $('title').textContent = info.fair_name;
+      const n = MSF.now();
+      const day = fixedDay || n.date;
+      // Today plus the next day, so the screen isn't empty after the last show.
+      const next = new Date(day + 'T12:00:00Z'); next.setUTCDate(next.getUTCDate() + 1);
+      const nextDay = next.toISOString().slice(0, 10);
+      const r = await MSF.api(`/api/events?from=${day}&to=${nextDay}`);
+      MSF.setNow(r.now);
+      const all = filter(r.events);
+      const todays = all.filter((e) => e.date === day);
+      const now = todays.filter((e) => status(e) === 'now');
+      const upcoming = todays.filter((e) => fixedDay || status(e) === 'upcoming' || (e.cancelled && e.start_time >= n.time));
+      const tomorrow = all.filter((e) => e.date === nextDay);
+
+      $('nowBand').hidden = !now.length;
+      $('nowGrid').innerHTML = now.slice(0, 6).map((e) => `
+        <div class="now-card"><div class="t">${esc(e.title)}</div><div class="w">${esc(where(e))}</div>
+        <div class="tm">${e.end_time ? `Until ${fmtTime(e.end_time)}` : `Started ${fmtTime(e.start_time)}`}</div></div>`).join('');
+
+      let out = '';
+      if (upcoming.length) out += `<div class="list-head">${fixedDay ? fmtDay(day, { weekday: 'long', month: 'long', day: 'numeric' }) : 'Coming up today'}</div>` + upcoming.map(row).join('');
+      if (tomorrow.length && (!fixedDay || !upcoming.length)) out += `<div class="day-break">${fmtDay(nextDay, { weekday: 'long', month: 'long', day: 'numeric' })}</div>` + tomorrow.map(row).join('');
+      if (!out) out = `<div class="empty">${now.length ? '' : 'No more events scheduled. See you at the fair!'}</div>`;
+      if (out !== html) { html = out; build(); }
+      $('updated').textContent = `Updated ${fmtTime(MSF.now().time)}`;
+    } catch (err) {
+      $('updated').textContent = 'Offline: showing last schedule';
+    }
+  }
+
+  // Two copies of the list make the scroll loop seamless. Short lists don't scroll.
+  function build() {
+    const track = $('track');
+    track.innerHTML = `<div id="copyA">${html}</div>`;
+    const h = $('copyA').offsetHeight;
+    const fits = h <= $('viewport').clientHeight - 30;
+    if (fits) { loopH = 0; offset = 0; track.style.transform = ''; return; }
+    track.innerHTML = `<div id="copyA">${html}<div style="height:3rem"></div></div><div>${html}</div>`;
+    loopH = $('copyA').offsetHeight;
+    offset = offset % loopH;
+  }
+
+  let last = performance.now();
+  function frame(t) {
+    const dt = Math.min(t - last, 100) / 1000;
+    last = t;
+    if (loopH && t > pauseUntil) {
+      offset += speed * dt;
+      if (offset >= loopH) { offset -= loopH; pauseUntil = t + 3000; }
+      $('track').style.transform = `translateY(${-offset}px)`;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function tick() {
+    const n = MSF.now();
+    $('clock').textContent = fmtTime(n.time).replace(/^(\d+) /, '$1:00 ');
+    $('date').textContent = fmtDay(fixedDay || n.date, { weekday: 'long', month: 'long', day: 'numeric' });
+  }
+
+  refresh().then(() => { pauseUntil = performance.now() + 4000; requestAnimationFrame(frame); });
+  setInterval(refresh, 60000);
+  setInterval(tick, 1000); tick();
+  window.addEventListener('resize', build);
+  // Long-running kiosk browsers leak; a reload every 6 hours keeps them healthy.
+  setTimeout(() => location.reload(), 6 * 3600 * 1000);
+})();
+</script>
+</body>
+</html>

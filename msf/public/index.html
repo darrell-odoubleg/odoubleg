@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12284b">
+<title>Montana State Fair Events</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <img class="star" src="/icon.svg" alt="">
+    <div>
+      <h1 id="fairName">Montana State Fair</h1>
+      <div class="sub" id="subline">Daily events</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="tabs" role="tablist">
+      <button class="tabbtn" role="tab" aria-selected="true" data-view="schedule">Schedule</button>
+      <button class="tabbtn" role="tab" aria-selected="false" data-view="map">Map</button>
+    </div>
+  </div>
+  <nav class="days" id="days" aria-label="Fair days"></nav>
+</header>
+
+<main>
+  <section id="view-schedule">
+    <div class="banner" id="apkBanner" hidden>
+      <span style="flex:1">Get the fair app for Android, with indoor directions.</span>
+      <a class="btn gold" href="/download">Download</a>
+    </div>
+    <div class="filters">
+      <input class="search" id="search" type="search" placeholder="Search events, places…" aria-label="Search">
+      <div class="chips" id="chips"></div>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <section id="view-map" hidden>
+    <div class="mapbar">
+      <select id="mapPick" aria-label="Floor plan"></select>
+      <select id="destPick" aria-label="Destination"><option value="">Choose a destination…</option></select>
+      <button class="btn" id="clearRoute" hidden>Clear</button>
+    </div>
+    <div class="mapwrap" id="mapwrap" style="height:70vh">
+      <div class="stage" id="stage">
+        <img id="mapImg" alt="Fairgrounds floor plan">
+        <svg id="overlay"></svg>
+      </div>
+    </div>
+    <p class="mapnote" id="mapNote">Pinch or scroll to zoom. Tap a pin to see what's happening there.</p>
+    <div id="pinInfo"></div>
+  </section>
+</main>
+
+<script src="/shared.js"></script>
+<script src="/mapview.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

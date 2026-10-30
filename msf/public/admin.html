@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#12284b">
+<title>Fair Events Admin</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 14px; }
+  .login { max-width: 360px; margin: 10vh auto; }
+  label { display: block; font-size: .82rem; font-weight: 600; color: var(--muted); margin: 10px 0 4px; }
+  input[type=text], input[type=password], input[type=date], input[type=time], input[type=number], select, textarea {
+    width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 9px 11px;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 12px; }
+  @media (max-width: 560px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+  .checks { display: flex; flex-wrap: wrap; gap: 6px; }
+  .checks label { display: inline-flex; align-items: center; gap: 6px; margin: 0; border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; color: var(--ink); font-weight: 500; cursor: pointer; }
+  .checks input:checked + span { font-weight: 700; }
+  .row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .err { color: var(--red); font-size: .9rem; margin-top: 8px; min-height: 1.2em; }
+  .ok { color: var(--now-ink); }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .75rem; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  td .btn { padding: 4px 9px; font-size: .82rem; }
+  .tablewrap { overflow-x: auto; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .toolbar select { width: auto; flex: 0 1 220px; }
+  .muted { color: var(--muted); font-size: .85rem; }
+  .flags { display: flex; gap: 16px; margin-top: 12px; }
+  .flags label { display: inline-flex; gap: 6px; align-items: center; margin: 0; color: var(--ink); font-weight: 500; }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 5px; font-size: .88em; word-break: break-all; }
+  dialog { border: 0; border-radius: var(--radius); padding: 0; width: min(640px, calc(100vw - 32px)); background: var(--card); color: var(--ink); }
+  dialog::backdrop { background: rgba(10, 20, 40, .5); }
+  dialog .card { margin: 0; border: 0; box-shadow: none; max-height: 88vh; overflow: auto; }
+</style>
+</head>
+<body>
+<section id="loginView" class="login card" hidden>
+  <h2 style="margin-top:0">Fair events admin</h2>
+  <form id="loginForm">
+    <label for="lu">Username</label><input type="text" id="lu" autocomplete="username" required>
+    <label for="lp">Password</label><input type="password" id="lp" autocomplete="current-password" required>
+    <div class="err" id="loginErr"></div>
+    <button class="btn primary" style="width:100%;justify-content:center">Sign in</button>
+  </form>
+</section>
+
+<div id="appView" hidden>
+  <header class="top" style="padding-bottom:12px">
+    <div class="brand">
+      <img class="star" src="/icon.svg" alt="">
+      <div><h1>Events admin</h1><div class="sub" id="who"></div></div>
+      <div class="spacer"></div>
+      <div class="tabs" role="tablist">
+        <button class="tabbtn" data-tab="events" aria-selected="true">Events</button>
+        <button class="tabbtn" data-tab="locations" aria-selected="false">Locations</button>
+        <button class="tabbtn" data-tab="settings" aria-selected="false">Settings</button>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width:1000px">
+    <!-- EVENTS -->
+    <section id="tab-events">
+      <div class="toolbar">
+        <select id="dayFilter" aria-label="Day"></select>
+        <input type="text" id="evSearch" placeholder="Filter…" style="flex:1 1 160px;width:auto">
+        <button class="btn primary" id="addEvent">+ Add event</button>
+      </div>
+      <div class="card tablewrap" style="padding:6px 12px">
+        <table>
+          <thead><tr><th>Day</th><th>Time</th><th>Event</th><th>Where</th><th></th></tr></thead>
+          <tbody id="evRows"></tbody>
+        </table>
+      </div>
+      <p class="muted">Public schedule: <a href="/" target="_blank">msf.odoubleg.com</a> · Kiosk: <a href="/kiosk" target="_blank">msf.odoubleg.com/kiosk</a></p>
+    </section>
+
+    <!-- LOCATIONS -->
+    <section id="tab-locations" hidden>
+      <div class="card">
+        <div class="toolbar" style="margin:0 0 10px">
+          <select id="locMap" aria-label="Floor plan"></select>
+          <span class="muted" id="locHint">Pick a location below, then click the map to set its spot.</span>
+        </div>
+        <div class="mapwrap" id="locMapWrap" style="height:58vh">
+          <div class="stage"><img alt="Floor plan"><svg></svg></div>
+        </div>
+      </div>
+      <div class="card">
+        <form id="locForm" class="grid3" style="align-items:end">
+          <div><label for="locName">Location name</label><input type="text" id="locName" placeholder="e.g. Four Seasons Arena" required></div>
+          <div><label for="locNotes">Notes (optional)</label><input type="text" id="locNotes" placeholder="Entrance, gate, etc."></div>
+          <div><button class="btn primary" style="width:100%;justify-content:center">Add location</button></div>
+        </form>
+        <div class="err" id="locErr"></div>
+        <div class="tablewrap">
+          <table><thead><tr><th>Name</th><th>On map</th><th></th></tr></thead><tbody id="locRows"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="tab-settings" hidden>
+      <form class="card" id="setForm">
+        <label for="sName">Fair name</label><input type="text" id="sName">
+        <div class="grid2">
+          <div><label for="sStart">First day</label><input type="date" id="sStart"></div>
+          <div><label for="sEnd">Last day</label><input type="date" id="sEnd"></div>
+        </div>
+        <label for="sSpeed">Kiosk scroll speed (pixels per second)</label><input type="number" id="sSpeed" min="5" max="300">
+        <label for="sMist">Mist mobile SDK secret (for the Android app's indoor location)</label>
+        <input type="text" id="sMist" placeholder="From Mist: Organization → Mobile SDK" autocomplete="off">
+        <p class="muted">The Android app reads this when it starts, so you can change it here without a new app build. Leave it empty to turn indoor location off.</p>
+        <div class="err" id="setErr"></div>
+        <button class="btn primary">Save settings</button>
+      </form>
+      <div class="card">
+        <h3 style="margin-top:0">Kiosk screens</h3>
+        <p class="muted">Open this on the kiosk browser in full-screen mode. It scrolls on its own, refreshes every minute, and moves to the next day at midnight.</p>
+        <p><code id="kioskUrl"></code></p>
+        <p class="muted">Options: <code>?location=ID</code> shows one venue (IDs are on the Locations tab) · <code>?category=music</code> · <code>?speed=60</code> · <code>?theme=light</code></p>
+        <h3>Android app</h3>
+        <p class="muted" id="apkInfo"></p>
+      </div>
+      <button class="btn" id="logout">Sign out</button>
+    </section>
+  </main>
+</div>
+
+<dialog id="evDialog">
+  <form class="card" id="evForm" method="dialog">
+    <h3 style="margin-top:0" id="evTitle">Add event</h3>
+    <label for="fTitle">Event name</label><input type="text" id="fTitle" required maxlength="200">
+    <div id="fDatesWrap">
+      <label>Days <span class="muted">(pick several for a show that repeats)</span></label>
+      <div class="checks" id="fDates"></div>
+    </div>
+    <div id="fDateWrap" hidden><label for="fDate">Day</label><input type="date" id="fDate"></div>
+    <div class="grid2">
+      <div><label for="fStart">Starts</label><input type="time" id="fStart" required></div>
+      <div><label for="fEnd">Ends (optional)</label><input type="time" id="fEnd"></div>
+    </div>
+    <div class="grid2">
+      <div><label for="fLoc">Location</label><select id="fLoc"></select></div>
+      <div><label for="fLocText">Location detail (optional)</label><input type="text" id="fLocText" placeholder="Barn 3, Main Stage…"></div>
+    </div>
+    <label for="fCat">Category</label><select id="fCat"></select>
+    <label for="fDesc">Description (optional)</label><textarea id="fDesc" maxlength="4000"></textarea>
+    <div class="flags">
+      <label><input type="checkbox" id="fFeat"> Featured</label>
+      <label><input type="checkbox" id="fCancel"> Cancelled</label>
+    </div>
+    <div class="err" id="evErr"></div>
+    <div class="row-actions">
+      <button class="btn primary" id="evSave" value="save">Save</button>
+      <button class="btn" type="button" id="evDup" hidden>Duplicate</button>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn danger" type="button" id="evDelete" hidden>Delete</button>
+      <button class="btn" type="button" id="evCancel">Close</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/shared.js"></script>
+<script src="/mapview.js"></script>
+<script src="/admin.js"></script>
+</body>
+</html>
