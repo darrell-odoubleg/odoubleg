@@ -109,13 +109,33 @@
     $('mapPick').innerHTML = state.maps.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
     $('mapPick').hidden = state.maps.length < 2;
     $('destPick').innerHTML = '<option value="">Choose a destination…</option>' +
-      state.locations.filter((x) => x.map_id && x.x != null).map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
+      state.locations.filter((x) => x.map_id && x.x != null).map((x) => `<option value="${x.id}">${esc(spotLabel(x))}</option>`).join('');
     if (!state.maps.length) {
       $('mapNote').textContent = 'The fairgrounds map is not available right now.';
       return;
     }
     mv.setMap(state.maps[0]);
     mv.setPins(state.locations);
+    mapNote();
+  }
+
+  // "22 · 3 Rivers Stage" for spots that match a number printed on the fairgrounds map.
+  function spotLabel(l) {
+    const n = /^Map #(\d+)/.exec(l.notes || '');
+    return n ? `${n[1]} · ${l.name}` : l.name;
+  }
+  const isIndoor = (mapId) => { const m = state.maps.find((x) => x.id === mapId); return Boolean(m && !m.static); };
+  function mapNote() {
+    if (state.dest) return;
+    $('mapNote').textContent = mv.map && mv.map.static
+      ? 'Pinch or scroll to zoom. Tap a numbered spot to see what\'s happening there.'
+      : 'Pinch or scroll to zoom. Tap a pin to see what\'s happening there.';
+  }
+  function switchMap(m) {
+    if (!m) return;
+    mv.setMap(m);
+    $('mapPick').value = m.id;
+    mapNote();
   }
 
   async function showPin(p) {
@@ -125,19 +145,20 @@
     const r = await MSF.api(`/api/events?date=${day}`).catch(() => ({ events: [] }));
     const here = r.events.filter((e) => e.location_id === p.id && status(e) !== 'past');
     $('pinInfo').innerHTML = `
-      <div class="group-label">${esc(p.name)}${here.length ? ' · today' : ''}</div>
+      <div class="group-label">${esc(spotLabel(p))}${here.length ? ' · today' : ''}</div>
       ${here.length ? here.map(card).join('') : '<div class="empty" style="padding:14px">Nothing else scheduled here today.</div>'}
-      ${native ? `<button class="btn primary" data-route="${p.id}">Directions to ${esc(p.name)}</button>` : ''}`;
+      ${native && isIndoor(p.map_id) ? `<button class="btn primary" data-route="${p.id}">Directions to ${esc(p.name)}</button>` : ''}`;
   }
 
   function goTo(locId) {
     const p = state.locations.find((x) => x.id === Number(locId));
     if (!p) return;
-    const m = state.maps.find((x) => x.id === p.map_id);
-    if (m) { mv.setMap(m); $('mapPick').value = m.id; }
+    switchMap(state.maps.find((x) => x.id === p.map_id));
     mv.focus(p.x, p.y);
     showPin(p);
-    if (native) startRoute(p);
+    // Directions need the Mist SDK, which only covers the indoor floor plans.
+    if (native && isIndoor(p.map_id)) startRoute(p);
+    else if (state.dest) { state.dest = null; mv.setRoute(null); $('clearRoute').hidden = true; }
   }
 
   // ---------- Mist SDK bridge (Android app only) ----------
@@ -158,10 +179,11 @@
     onLocation(x, y, mapId) {
       const first = !lastDot;
       lastDot = { x, y, mapId };
-      const m = state.maps.find((v) => v.id === mapId);
-      if (m && mv.map && mv.map.id !== mapId) { mv.setMap(m); $('mapPick').value = m.id; }
-      mv.setDot({ x, y });
-      if (first) { $('mapNote').textContent = 'Blue dot is you.'; requestRoute(); }
+      // Follow the dot to its floor plan only while routing there; otherwise leave the map the visitor picked.
+      if (state.dest && state.dest.map_id === mapId && mv.map && mv.map.id !== mapId) switchMap(state.maps.find((v) => v.id === mapId));
+      mv.setDot({ x, y, mapId });
+      if (first && mv.map && mv.map.id === mapId) $('mapNote').textContent = 'Blue dot is you.';
+      if (first) requestRoute();
     },
     // nodes: [{x, y}] from IndoorLocationManager.getWayFindingPathTo, or [] when no paths are drawn.
     onRoute(json) {
@@ -220,10 +242,11 @@
     }
   });
   $('search').addEventListener('input', (e) => { state.q = e.target.value; renderList(); });
-  $('mapPick').addEventListener('change', (e) => mv.setMap(state.maps.find((m) => m.id === e.target.value)));
+  $('mapPick').addEventListener('change', (e) => switchMap(state.maps.find((m) => m.id === e.target.value)));
   $('destPick').addEventListener('change', (e) => e.target.value && goTo(e.target.value));
   $('clearRoute').addEventListener('click', () => {
     state.dest = null;
+    mapNote();
     mv.setRoute(null);
     mv.select(null);
     $('clearRoute').hidden = true;

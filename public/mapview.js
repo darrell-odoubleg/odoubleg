@@ -21,9 +21,15 @@ function MapView(wrap, opts = {}) {
   function fit() {
     if (!map) return;
     const w = wrap.clientWidth, h = wrap.clientHeight;
+    if (!w || !h) return; // hidden tab; fit again when shown
     const s = Math.min(w / map.width, h / map.height);
     minScale = s * 0.8;
     view = { s, x: (w - map.width * s) / 2, y: (h - map.height * s) / 2 };
+    // A wide printed map in a tall phone frame: fill the height and center on its main area instead.
+    if (map.center && h / map.height > s * 1.2) {
+      const c = h / map.height;
+      view = { s: c, x: Math.min(0, Math.max(w - map.width * c, w / 2 - map.center[0] * c)), y: 0 };
+    }
     apply();
   }
 
@@ -43,6 +49,9 @@ function MapView(wrap, opts = {}) {
 
   function px(m) { return m * map.ppm; }
 
+  // The printed map already shows numbered spots, so only the selected pin is drawn there (admin sees all).
+  function hiddenPin(p) { return map.static && !opts.labels && selected !== p.id; }
+
   // Markers keep a constant on-screen size, so redraw at each zoom.
   function draw() {
     svg.innerHTML = '';
@@ -54,7 +63,7 @@ function MapView(wrap, opts = {}) {
       el('polyline', { points: pts, fill: 'none', stroke: '#1565c0', 'stroke-width': 6 * r, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-dasharray': route.direct ? `${10 * r} ${8 * r}` : 'none' });
     }
     for (const p of pins) {
-      if (p.map_id !== map.id || p.x == null) continue;
+      if (p.map_id !== map.id || p.x == null || hiddenPin(p)) continue;
       const on = selected === p.id;
       const g = el('g', { class: 'pin', transform: `translate(${px(p.x)},${px(p.y)}) scale(${r})` });
       el('path', { d: 'M0 0 C-4 -8 -12 -12 -12 -20 A12 12 0 1 1 12 -20 C12 -12 4 -8 0 0Z', fill: on ? '#353653' : '#e4332d', stroke: '#fff', 'stroke-width': 2 }, g);
@@ -64,7 +73,7 @@ function MapView(wrap, opts = {}) {
         t.textContent = p.name;
       }
     }
-    if (dot) {
+    if (dot && (!dot.mapId || dot.mapId === map.id)) {
       const g = el('g', { transform: `translate(${px(dot.x)},${px(dot.y)}) scale(${r})` });
       el('circle', { r: 22, fill: 'rgba(21,101,192,.18)' }, g);
       el('circle', { r: 9, fill: '#1e88e5', stroke: '#fff', 'stroke-width': 3 }, g);
@@ -105,7 +114,7 @@ function MapView(wrap, opts = {}) {
     let best = null, bestD = 26;
     for (const p of pins) {
       if (p.map_id !== map.id || p.x == null) continue;
-      const d = Math.hypot(view.x + px(p.x) * view.s - sx, view.y + px(p.y) * view.s - 20 - sy);
+      const d = Math.hypot(view.x + px(p.x) * view.s - sx, view.y + px(p.y) * view.s - (hiddenPin(p) ? 0 : 20) - sy);
       if (d < bestD) { best = p; bestD = d; }
     }
     return best;

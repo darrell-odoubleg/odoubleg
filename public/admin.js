@@ -278,7 +278,7 @@
       try {
         state.maps = (await api('/api/maps')).maps;
       } catch (err) {
-        $('locHint').textContent = 'Could not load floor plans from Mist.';
+        $('locHint').textContent = 'Could not load the maps.';
       }
       state.mapsLoaded = true;
       $('locMap').innerHTML = state.maps.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
@@ -310,7 +310,9 @@
     try {
       if (t.dataset.place) {
         setPlacing(loc.id);
-        if (loc.x != null) mv.focus(loc.x, loc.y);
+        const m = state.maps.find((x) => x.id === loc.map_id);
+        if (m && mv.map && mv.map.id !== m.id) { mv.setMap(m); $('locMap').value = m.id; }
+        else if (loc.x != null) mv.focus(loc.x, loc.y);
         $('locMapWrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else if (t.dataset.rename) {
         const name = prompt('Location name', loc.name);

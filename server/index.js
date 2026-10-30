@@ -200,16 +200,22 @@ app.get('/api/locations', (req, res) => {
   res.json({ locations: db.prepare('SELECT * FROM locations ORDER BY sort, name').all() });
 });
 
+// The printed fairgrounds map comes first; Mist floor plans follow. It has no real scale,
+// so ppm is 1 and location x/y on it are image pixels. Only Mist maps support indoor location.
+const FAIRGROUNDS_IMG = path.join(__dirname, '..', 'assets', 'fairgrounds-map.png');
+const FAIRGROUNDS = { id: 'fairgrounds', name: 'Fairgrounds', width: 1680, height: 1100, ppm: 1, width_m: 1680, height_m: 1100, wayfinding: [], static: true, center: [570, 640] };
+
 app.get('/api/maps', async (req, res) => {
   try {
-    res.json({ maps: await mist.listMaps() });
+    res.json({ maps: [FAIRGROUNDS, ...await mist.listMaps()] });
   } catch (err) {
     console.error('[maps]', err.message);
-    res.status(502).json({ error: 'Could not load floor plans from Mist', maps: [] });
+    res.json({ maps: [FAIRGROUNDS] });
   }
 });
 
 app.get('/api/maps/:id/image', async (req, res) => {
+  if (req.params.id === FAIRGROUNDS.id) return res.set('Cache-Control', 'public, max-age=3600').sendFile(FAIRGROUNDS_IMG);
   try {
     const file = await mist.mapImagePath(req.params.id);
     if (!file) return res.status(404).end();
