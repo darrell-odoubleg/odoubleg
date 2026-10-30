@@ -8,6 +8,7 @@ declare -A APPS=(
   [sitenotes]=/var/www/sitenotes-odoubleg
   [stocks]=/var/www/stocks-odoubleg
   [stock]=/var/www/stock-odoubleg
+  [msf]=/var/www/msf-odoubleg
   [medreview]=/var/www/medreview-odoubleg
 )
 for prefix in "${!APPS[@]}"; do
