@@ -4,7 +4,8 @@ Node/Express + SQLite (better-sqlite3), pm2 name `msf-odoubleg`, 127.0.0.1:4400 
 
 - `/` public daily schedule (phones) with a Map tab
 - `/kiosk` auto-scrolling display for digital signs. URL options: `?location=<id>`, `?category=<id>`, `?speed=<px/s>`, `?theme=light`, `?day=YYYY-MM-DD`
-- `/admin` add/edit events (one form can add a show on several days), locations (click the Mist floor plan to place), settings
+- `/admin` add/edit events (one form can add a show on several days), locations (click the fairgrounds map or a Mist floor plan to place), settings
+- Map tab: the printed fairgrounds map (`assets/fairgrounds-map.png`, x/y in image pixels, map id `fairgrounds`) comes first, then the Mist floor plans. Its 36 numbered spots plus the main areas were loaded with `node scripts/seed-fairgrounds.js` (safe to re-run). Directions / blue dot only work on Mist floor plans.
 - `/download` the Android APK (`data/apk/msf.apk`)
 
 County calendar: `server/countyFeed.js` imports the Cascade County ExpoPark iCal feed (Settings → County calendar) hourly as `source='county'` events, skipping anything titled Private Event (incl. typos like "PRVATE EVENT"). Imported events can't be edited, only hidden/featured/mapped; events the county removes are deleted on the next sync.

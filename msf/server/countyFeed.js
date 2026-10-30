@@ -85,7 +85,10 @@ function guessCategory(title) {
 function matchLocation(text, locations) {
   if (!text) return null;
   const t = text.toLowerCase();
-  const hit = locations.find((l) => t.includes(l.name.toLowerCase()) || l.name.toLowerCase().includes(t));
+  // Prefer the closest name, so "Arena" doesn't win over "Arena Box Office" by accident of id order.
+  const hit = locations
+    .filter((l) => t.includes(l.name.toLowerCase()) || l.name.toLowerCase().includes(t))
+    .sort((a, b) => Math.abs(a.name.length - t.length) - Math.abs(b.name.length - t.length))[0];
   return hit ? hit.id : null;
 }
 
