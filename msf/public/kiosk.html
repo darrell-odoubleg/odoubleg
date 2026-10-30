@@ -8,23 +8,26 @@
 <style>
   /* Options in the URL: ?speed=40 (px/sec) &location=<id> &category=<id> &theme=light &day=YYYY-MM-DD */
   :root {
-    --bg: #0b1730; --panel: #12284b; --card: #172f57; --ink: #ffffff; --muted: #b6c3da; --gold: #f2a900; --line: #24406e;
-    --now: #1f6b3a; --red: #e0384f;
+    /* Montana ExpoPark logo colors */
+    --bg: #1b1c2c; --panel: #353653; --card: #2a2b44; --ink: #ffffff; --muted: #b9bbd0; --accent: #e4332d; --line: #3a3c5c;
+    --now: #e4332d; --cancel: #6b6d80;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     font-size: clamp(14px, 1.45vw, 30px);
   }
   @media (orientation: portrait) { :root { font-size: clamp(14px, 2.6vw, 34px); } }
-  :root[data-theme="light"] { --bg: #f4f1ea; --panel: #12284b; --card: #ffffff; --ink: #1b2330; --muted: #5f6b7a; --line: #e2ddd2; --now: #1d6b35; }
+  :root[data-theme="light"] { --bg: #f5f5f8; --panel: #353653; --card: #ffffff; --ink: #23243a; --muted: #62647a; --line: #e1e1ea; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); cursor: none; }
   body { display: flex; flex-direction: column; }
-  header { background: var(--panel); color: #fff; display: flex; align-items: center; gap: 1rem; padding: .9rem 1.6rem; border-bottom: .3rem solid var(--gold); }
-  header img { width: 3rem; height: 3rem; }
-  header h1 { margin: 0; font-size: 1.9rem; line-height: 1.1; }
-  header .date { color: #c9d4e6; font-size: 1.05rem; }
-  header .clock { margin-left: auto; font-size: 2.6rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  header { background: #000; color: #fff; display: flex; align-items: center; gap: 1.4rem; padding: 0 1.6rem 0 0; border-bottom: .35rem solid var(--accent); }
+  header img { height: 8.5rem; width: auto; display: block; }
+  header .when { margin-left: auto; text-align: right; }
+  header .date { color: #d6d7e6; font-size: 1.15rem; }
+  header .clock { font-size: 2.8rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; line-height: 1.1; }
+  @media (orientation: portrait) { header img { height: 7rem; } }
   .now-band { padding: 1rem 1.6rem .4rem; }
-  .now-band h2, .list-head { margin: 0 0 .6rem; font-size: .95rem; text-transform: uppercase; letter-spacing: .12em; color: var(--gold); }
+  .now-band h2, .list-head { margin: 0 0 .6rem; font-size: .95rem; text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
+  :root:not([data-theme="light"]) .now-band h2, :root:not([data-theme="light"]) .list-head { color: #ff6b63; }
   .now-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: .8rem; }
   .now-card { background: var(--now); color: #fff; border-radius: .8rem; padding: .9rem 1.1rem; }
   .now-card .t { font-size: 1.35rem; font-weight: 800; line-height: 1.15; }
@@ -45,22 +48,22 @@
   :root[data-theme="light"] .row .cat { color: var(--cat); }
   .row.cancelled .t { text-decoration: line-through; opacity: .7; }
   .tag { display: inline-block; font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: .12rem .45rem; border-radius: .35rem; margin-right: .4rem; vertical-align: middle; }
-  .tag.cancel { background: var(--red); color: #fff; }
-  .tag.feat { background: var(--gold); color: #12284b; }
-  .day-break { font-size: 1.1rem; font-weight: 800; color: var(--gold); margin: 1.2rem 0 .6rem; text-transform: uppercase; letter-spacing: .1em; }
+  .tag.cancel { background: var(--cancel); color: #fff; }
+  .tag.feat { background: var(--accent); color: #fff; }
+  .day-break { font-size: 1.1rem; font-weight: 800; color: #ff6b63; margin: 1.2rem 0 .6rem; text-transform: uppercase; letter-spacing: .1em; }
   .empty { color: var(--muted); font-size: 1.4rem; text-align: center; padding: 4rem 1rem; }
   footer { display: flex; justify-content: space-between; padding: .55rem 1.6rem; font-size: .9rem; color: var(--muted); border-top: 1px solid var(--line); }
-  footer b { color: var(--gold); }
+  footer b { color: #ff6b63; }
+  :root[data-theme="light"] footer b, :root[data-theme="light"] .day-break { color: var(--accent); }
 </style>
 </head>
 <body>
 <header>
-  <img src="/icon.svg" alt="">
-  <div>
-    <h1 id="title">Montana State Fair</h1>
+  <img src="/msf-banner.jpg" alt="Montana State Fair">
+  <div class="when">
+    <div class="clock" id="clock"></div>
     <div class="date" id="date"></div>
   </div>
-  <div class="clock" id="clock"></div>
 </header>
 <section class="now-band" id="nowBand" hidden>
   <h2>Happening now</h2>
@@ -94,7 +97,7 @@
   function row(e) {
     const c = category(e.category);
     return `<div class="row${e.cancelled ? ' cancelled' : ''}" style="--cat:${c.color}">
-      <div class="tm">${fmtTime(e.start_time)}${e.end_time ? `<small>to ${fmtTime(e.end_time)}</small>` : ''}</div>
+      <div class="tm">${e.all_day ? 'All day' : fmtTime(e.start_time)}${e.end_time && !e.all_day ? `<small>to ${fmtTime(e.end_time)}</small>` : ''}</div>
       <div><div class="t">${e.cancelled ? '<span class="tag cancel">Cancelled</span>' : ''}${e.featured && !e.cancelled ? '<span class="tag feat">Featured</span>' : ''}${esc(e.title)}</div>
       <div class="w">${esc(where(e))}</div></div>
       <div class="cat">${esc(c.label)}</div>
@@ -106,7 +109,6 @@
       info = await MSF.api('/api/info');
       MSF.setNow(info.now);
       if (!speed) speed = info.kiosk_speed;
-      $('title').textContent = info.fair_name;
       const n = MSF.now();
       const day = fixedDay || n.date;
       // Today plus the next day, so the screen isn't empty after the last show.
@@ -123,7 +125,7 @@
       $('nowBand').hidden = !now.length;
       $('nowGrid').innerHTML = now.slice(0, 6).map((e) => `
         <div class="now-card"><div class="t">${esc(e.title)}</div><div class="w">${esc(where(e))}</div>
-        <div class="tm">${e.end_time ? `Until ${fmtTime(e.end_time)}` : `Started ${fmtTime(e.start_time)}`}</div></div>`).join('');
+        <div class="tm">${e.all_day ? 'All day' : e.end_time ? `Until ${fmtTime(e.end_time)}` : `Started ${fmtTime(e.start_time)}`}</div></div>`).join('');
 
       let out = '';
       if (upcoming.length) out += `<div class="list-head">${fixedDay ? fmtDay(day, { weekday: 'long', month: 'long', day: 'numeric' }) : 'Coming up today'}</div>` + upcoming.map(row).join('');

@@ -57,10 +57,10 @@ function MapView(wrap, opts = {}) {
       if (p.map_id !== map.id || p.x == null) continue;
       const on = selected === p.id;
       const g = el('g', { class: 'pin', transform: `translate(${px(p.x)},${px(p.y)}) scale(${r})` });
-      el('path', { d: 'M0 0 C-4 -8 -12 -12 -12 -20 A12 12 0 1 1 12 -20 C12 -12 4 -8 0 0Z', fill: on ? '#f2a900' : '#c8102e', stroke: '#fff', 'stroke-width': 2 }, g);
+      el('path', { d: 'M0 0 C-4 -8 -12 -12 -12 -20 A12 12 0 1 1 12 -20 C12 -12 4 -8 0 0Z', fill: on ? '#353653' : '#e4332d', stroke: '#fff', 'stroke-width': 2 }, g);
       el('circle', { cx: 0, cy: -20, r: 4.5, fill: '#fff' }, g);
       if (on || opts.labels) {
-        const t = el('text', { x: 0, y: -38, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700, fill: '#12284b', stroke: '#fff', 'stroke-width': 4, 'paint-order': 'stroke' }, g);
+        const t = el('text', { x: 0, y: -38, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700, fill: '#353653', stroke: '#fff', 'stroke-width': 4, 'paint-order': 'stroke' }, g);
         t.textContent = p.name;
       }
     }

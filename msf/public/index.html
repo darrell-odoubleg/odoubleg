@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#12284b">
+<meta name="theme-color" content="#000000">
 <title>Montana State Fair Events</title>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<header class="top">
+<div class="hero"><img src="/msf-banner.jpg" srcset="/msf-banner-700.jpg 700w, /msf-banner.jpg 1400w" sizes="(max-width: 1100px) 100vw, 1100px" alt="Montana State Fair"></div>
+<header class="top bar">
   <div class="brand">
-    <img class="star" src="/icon.svg" alt="">
     <div>
-      <h1 id="fairName">Montana State Fair</h1>
-      <div class="sub" id="subline">Daily events</div>
+      <h1 id="fairName" style="font-size:1rem">Events</h1>
+      <div class="sub" id="subline">Montana ExpoPark · Great Falls</div>
     </div>
     <div class="spacer"></div>
     <div class="tabs" role="tablist">
@@ -29,7 +29,7 @@
   <section id="view-schedule">
     <div class="banner" id="apkBanner" hidden>
       <span style="flex:1">Get the fair app for Android, with indoor directions.</span>
-      <a class="btn gold" href="/download">Download</a>
+      <a class="btn accent" href="/download">Download</a>
     </div>
     <div class="filters">
       <input class="search" id="search" type="search" placeholder="Search events, places…" aria-label="Search">

@@ -1,7 +1,7 @@
 // Helpers shared by the schedule, kiosk, and admin pages.
 const MSF = (() => {
   const CATEGORIES = [
-    { id: 'grandstand', label: 'Grandstand', color: '#c8102e' },
+    { id: 'grandstand', label: 'Grandstand', color: '#e4332d' },
     { id: 'music', label: 'Music', color: '#7b3fa0' },
     { id: 'rodeo', label: 'Rodeo', color: '#a0522d' },
     { id: 'livestock', label: 'Livestock', color: '#2e7d32' },
@@ -28,6 +28,7 @@ const MSF = (() => {
   }
 
   function fmtRange(ev) {
+    if (ev.all_day) return 'All day';
     return ev.end_time ? `${fmtTime(ev.start_time)} – ${fmtTime(ev.end_time)}` : fmtTime(ev.start_time);
   }
 
@@ -59,6 +60,7 @@ const MSF = (() => {
   function status(ev, n = now()) {
     if (ev.cancelled) return 'cancelled';
     if (ev.date !== n.date) return ev.date < n.date ? 'past' : 'upcoming';
+    if (ev.all_day) return 'now';
     const end = ev.end_time || addMinutes(ev.start_time, 30);
     if (n.time < ev.start_time) return 'upcoming';
     if (n.time < end || end < ev.start_time) return 'now';
