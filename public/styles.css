@@ -1,37 +1,39 @@
 :root {
-  --navy: #12284b;
-  --navy-2: #1d3a68;
-  --gold: #f2a900;
-  --gold-ink: #8a5f00;
-  --red: #c8102e;
-  --bg: #f4f1ea;
+  /* Colors from the Montana ExpoPark logo */
+  --navy: #353653;
+  --navy-2: #46476b;
+  --accent: #e4332d;
+  --accent-ink: #c22a24;
+  --red: #e4332d;
+  --cancel: #6b6d80;
+  --bg: #f5f5f8;
   --card: #ffffff;
-  --ink: #1b2330;
-  --muted: #5f6b7a;
-  --line: #e2ddd2;
+  --ink: #23243a;
+  --muted: #62647a;
+  --line: #e1e1ea;
   --now: #e8f6ec;
   --now-ink: #1d6b35;
   --radius: 12px;
-  --shadow: 0 1px 2px rgba(18, 40, 75, .08), 0 4px 14px rgba(18, 40, 75, .06);
+  --shadow: 0 1px 2px rgba(53, 54, 83, .08), 0 4px 14px rgba(53, 54, 83, .06);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0d1626;
-    --card: #15223a;
-    --ink: #e8edf5;
-    --muted: #9aa8bc;
-    --line: #26354f;
+    --bg: #1b1c2c;
+    --card: #26273d;
+    --ink: #ececf3;
+    --muted: #a3a5bb;
+    --line: #383a58;
     --now: #12331f;
     --now-ink: #7fdc9b;
-    --gold-ink: #f2c14e;
+    --accent-ink: #ff6b63;
     --shadow: none;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0d1626; --card: #15223a; --ink: #e8edf5; --muted: #9aa8bc; --line: #26354f;
-  --now: #12331f; --now-ink: #7fdc9b; --gold-ink: #f2c14e; --shadow: none;
+  --bg: #1b1c2c; --card: #26273d; --ink: #ececf3; --muted: #a3a5bb; --line: #383a58;
+  --now: #12331f; --now-ink: #7fdc9b; --accent-ink: #ff6b63; --shadow: none;
 }
 
 * { box-sizing: border-box; }
@@ -45,14 +47,17 @@ a { color: inherit; }
   background: var(--navy); color: #fff; position: sticky; top: 0; z-index: 20;
   padding: 14px 16px 0; padding-top: max(14px, env(safe-area-inset-top));
 }
+.hero { background: #000; display: block; line-height: 0; }
+.hero img { display: block; width: 100%; max-width: 1100px; height: auto; margin: 0 auto; aspect-ratio: 1400 / 500; }
+.top.bar { padding-top: 10px; border-top: 4px solid var(--accent); }
 .top .brand { display: flex; align-items: center; gap: 10px; max-width: 860px; margin: 0 auto; }
 .top .star { width: 34px; height: 34px; flex: none; }
 .top h1 { font-size: 1.15rem; margin: 0; letter-spacing: .2px; }
-.top .sub { font-size: .8rem; color: #c9d4e6; }
+.top .sub { font-size: .8rem; color: #cfd0e0; }
 .top .spacer { flex: 1; }
 .top .tabs { display: flex; gap: 4px; }
 .tabbtn {
-  background: transparent; border: 0; color: #c9d4e6; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight: 600;
+  background: transparent; border: 0; color: #cfd0e0; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight: 600;
 }
 .tabbtn[aria-selected="true"] { background: rgba(255,255,255,.14); color: #fff; }
 
@@ -66,9 +71,10 @@ a { color: inherit; }
   border-radius: 10px; padding: 6px 12px; text-align: center; cursor: pointer; min-width: 64px;
 }
 .day b { display: block; font-size: 1.05rem; }
-.day small { font-size: .72rem; color: #c9d4e6; text-transform: uppercase; letter-spacing: .5px; }
-.day[aria-selected="true"] { background: var(--gold); border-color: var(--gold); color: var(--navy); }
-.day[aria-selected="true"] small { color: var(--navy); }
+.day small { font-size: .72rem; color: #cfd0e0; text-transform: uppercase; letter-spacing: .5px; }
+.day[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.day[aria-selected="true"] small { color: #fff; }
+.day.fair { border-color: rgba(255,255,255,.55); }
 .day.today small::after { content: " • today"; }
 
 main { max-width: 860px; margin: 0 auto; padding: 14px 16px 90px; }
@@ -107,8 +113,8 @@ main { max-width: 860px; margin: 0 auto; padding: 14px 16px 90px; }
 .event.cancelled h3 { text-decoration: line-through; }
 .badge { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 2px 7px; border-radius: 6px; }
 .badge.now { background: var(--now-ink); color: var(--card); }
-.badge.cancel { background: var(--red); color: #fff; }
-.badge.feat { background: var(--gold); color: var(--navy); }
+.badge.cancel { background: var(--cancel); color: #fff; }
+.badge.feat { background: var(--accent); color: #fff; }
 .empty { text-align: center; color: var(--muted); padding: 40px 10px; }
 
 .btn {
@@ -116,7 +122,7 @@ main { max-width: 860px; margin: 0 auto; padding: 14px 16px 90px; }
   display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
 }
 .btn.primary { background: var(--navy); border-color: var(--navy); color: #fff; }
-.btn.gold { background: var(--gold); border-color: var(--gold); color: var(--navy); }
+.btn.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.danger { color: var(--red); }
 .btn:disabled { opacity: .5; cursor: default; }
 

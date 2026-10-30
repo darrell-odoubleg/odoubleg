@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#12284b">
+<meta name="theme-color" content="#353653">
 <title>Fair Events Admin</title>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/styles.css">
@@ -115,6 +115,12 @@
           <div><label for="sEnd">Last day</label><input type="date" id="sEnd"></div>
         </div>
         <label for="sSpeed">Kiosk scroll speed (pixels per second)</label><input type="number" id="sSpeed" min="5" max="300">
+        <h3>County calendar</h3>
+        <label class="flags" style="margin:0"><span style="display:inline-flex;gap:6px;align-items:center;color:var(--ink);font-weight:500"><input type="checkbox" id="sCountyOn"> Show ExpoPark events from the Cascade County calendar</span></label>
+        <label for="sCountyUrl">Calendar feed link (iCal)</label><input type="text" id="sCountyUrl">
+        <p class="muted"><span id="countyStatus"></span> It updates every hour. Events titled "Private Event" are never shown. To hide any other imported event, open it on the Events tab.
+          <button class="btn" type="button" id="countySync" style="margin-left:6px">Sync now</button></p>
+        <h3>Indoor location</h3>
         <label for="sMist">Mist mobile SDK secret (for the Android app's indoor location)</label>
         <input type="text" id="sMist" placeholder="From Mist: Organization → Mobile SDK" autocomplete="off">
         <p class="muted">The Android app reads this when it starts, so you can change it here without a new app build. Leave it empty to turn indoor location off.</p>
@@ -142,11 +148,12 @@
       <label>Days <span class="muted">(pick several for a show that repeats)</span></label>
       <div class="checks" id="fDates"></div>
     </div>
-    <div id="fDateWrap" hidden><label for="fDate">Day</label><input type="date" id="fDate"></div>
-    <div class="grid2">
-      <div><label for="fStart">Starts</label><input type="time" id="fStart" required></div>
+    <div id="fDateWrap" hidden><label for="fDate" id="fDateLabel">Day</label><input type="date" id="fDate"></div>
+    <div class="grid2" id="fTimes">
+      <div><label for="fStart">Starts</label><input type="time" id="fStart"></div>
       <div><label for="fEnd">Ends (optional)</label><input type="time" id="fEnd"></div>
     </div>
+    <div class="flags" style="margin-top:8px"><label><input type="checkbox" id="fAllDay"> All day</label></div>
     <div class="grid2">
       <div><label for="fLoc">Location</label><select id="fLoc"></select></div>
       <div><label for="fLocText">Location detail (optional)</label><input type="text" id="fLocText" placeholder="Barn 3, Main Stage…"></div>
@@ -164,6 +171,27 @@
       <span class="spacer" style="flex:1"></span>
       <button class="btn danger" type="button" id="evDelete" hidden>Delete</button>
       <button class="btn" type="button" id="evCancel">Close</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="cDialog">
+  <form class="card" id="cForm" method="dialog">
+    <div class="muted">From the Cascade County calendar</div>
+    <h3 style="margin:4px 0" id="cTitle"></h3>
+    <div class="muted" id="cWhen"></div>
+    <p class="muted">The title, time, and place update from the county feed, so they can't be edited here.</p>
+    <label for="cLoc">Show on the map at</label><select id="cLoc"></select>
+    <div class="flags">
+      <label><input type="checkbox" id="cFeat"> Featured</label>
+      <label><input type="checkbox" id="cHide"> Hide from the schedule and kiosks</label>
+    </div>
+    <div class="err" id="cErr"></div>
+    <div class="row-actions">
+      <button class="btn primary">Save</button>
+      <a class="btn" id="cLink" target="_blank" rel="noopener">County page</a>
+      <span style="flex:1"></span>
+      <button class="btn" type="button" id="cClose">Close</button>
     </div>
   </form>
 </dialog>

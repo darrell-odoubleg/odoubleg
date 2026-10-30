@@ -53,13 +53,13 @@
   }
 
   async function loadEvents() {
-    state.events = (await api('/api/events')).events;
+    state.events = (await api('/api/events?all=1')).events;
     renderEvents();
   }
 
   async function loadLocations() {
     state.locations = (await api('/api/locations')).locations;
-    $('fLoc').innerHTML = '<option value="">— none —</option>' + state.locations.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
+    $('fLoc').innerHTML = $('cLoc').innerHTML = '<option value="">— none —</option>' + state.locations.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
     renderLocations();
   }
 
@@ -71,6 +71,13 @@
     $('sEnd').value = s.fair_end;
     $('sSpeed').value = s.kiosk_speed;
     $('sMist').value = s.mist_sdk_token;
+    $('sCountyOn').checked = s.county_feed_enabled !== '0';
+    $('sCountyUrl').value = s.county_feed_url;
+    let last = null;
+    try { last = JSON.parse(s.county_last_sync || 'null'); } catch {}
+    $('countyStatus').textContent = !last ? 'Not synced yet.'
+      : last.ok ? `Last synced ${new Date(last.at).toLocaleString()}: ${last.count} public events.`
+      : `Last sync failed ${new Date(last.at).toLocaleString()}: ${last.error}.`;
     $('kioskUrl').textContent = `${location.origin}/kiosk`;
     $('apkInfo').innerHTML = state.info && state.info.apk
       ? `Download and install on Android phones from <a href="/download">${location.origin}/download</a> (allow "install unknown apps" the first time).`
@@ -87,8 +94,8 @@
       <tr>
         <td>${fmtDay(e.date)}</td>
         <td style="white-space:nowrap">${fmtRange(e)}</td>
-        <td><b>${esc(e.title)}</b>${e.cancelled ? ' <span class="badge cancel">Cancelled</span>' : ''}${e.featured ? ' <span class="badge feat">Featured</span>' : ''}
-          <div class="muted">${esc(category(e.category).label)}</div></td>
+        <td${e.hidden ? ' style="opacity:.5"' : ''}><b>${esc(e.title)}</b>${e.cancelled ? ' <span class="badge cancel">Cancelled</span>' : ''}${e.featured ? ' <span class="badge feat">Featured</span>' : ''}${e.hidden ? ' <span class="badge cancel">Hidden</span>' : ''}
+          <div class="muted">${esc(category(e.category).label)}${e.source === 'county' ? ' · County calendar' : ''}</div></td>
         <td>${esc(MSF.where(e))}</td>
         <td style="white-space:nowrap"><button class="btn" data-edit="${e.id}">Edit</button></td>
       </tr>`).join('') || `<tr><td colspan="5" class="muted" style="padding:20px">${state.events.length ? 'No events match.' : 'No events yet. Set the fair dates in Settings, then add events.'}</td></tr>`;
@@ -98,7 +105,9 @@
   $('evSearch').addEventListener('input', renderEvents);
   $('evRows').addEventListener('click', (e) => {
     const b = e.target.closest('[data-edit]');
-    if (b) openEvent(state.events.find((x) => x.id === Number(b.dataset.edit)));
+    if (!b) return;
+    const ev = state.events.find((x) => x.id === Number(b.dataset.edit));
+    if (ev.source === 'county') openCounty(ev); else openEvent(ev);
   });
   $('addEvent').addEventListener('click', () => openEvent(null));
 
@@ -117,19 +126,24 @@
     $('fCat').value = ev ? ev.category || 'other' : 'other';
     $('fDesc').value = ev ? ev.description || '' : '';
     $('fFeat').checked = !!(ev && ev.featured);
+    $('fAllDay').checked = !!(ev && ev.all_day);
+    syncAllDay();
     $('fCancel').checked = !!(ev && ev.cancelled);
     $('fDatesWrap').hidden = editing;
     $('fDateWrap').hidden = !editing;
     $('evDelete').hidden = !editing;
     $('evDup').hidden = !editing;
+    $('fDateLabel').textContent = editing ? 'Day' : state.info.fair_days.length ? 'Or another day' : 'Day';
     if (editing) {
       $('fDate').value = ev.date;
     } else {
-      const days = state.info.days.length ? state.info.days : [MSF.now().date];
+      // Fair days as checkboxes; the date box below covers any other day.
+      const days = state.info.fair_days;
       const pre = ev ? ev.date : $('dayFilter').value;
       $('fDates').innerHTML = days.map((d) => `<label><input type="checkbox" value="${d}" ${d === pre ? 'checked' : ''}><span>${fmtDay(d)}</span></label>`).join('') +
-        (state.info.days.length ? '' : '<span class="muted">Set fair dates in Settings to pick from fair days.</span>');
-      if (!state.info.days.length) { $('fDateWrap').hidden = false; $('fDate').value = pre || MSF.now().date; }
+        (days.length ? '' : '<span class="muted">Set fair dates in Settings to pick from fair days.</span>');
+      $('fDateWrap').hidden = false;
+      $('fDate').value = pre && !days.includes(pre) ? pre : (days.length ? '' : MSF.now().date);
     }
     $('evDialog').showModal();
     $('fTitle').focus();
@@ -146,8 +160,53 @@
       description: $('fDesc').value,
       featured: $('fFeat').checked,
       cancelled: $('fCancel').checked,
+      all_day: $('fAllDay').checked,
     };
   }
+
+  function syncAllDay() {
+    $('fTimes').hidden = $('fAllDay').checked;
+  }
+  $('fAllDay').addEventListener('change', syncAllDay);
+
+  // ---------- county calendar events ----------
+  function openCounty(ev) {
+    state.editing = ev;
+    $('cTitle').textContent = ev.title;
+    $('cWhen').textContent = `${fmtDay(ev.date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · ${fmtRange(ev)} · ${ev.location_text || ''}`;
+    $('cLoc').value = ev.location_id || '';
+    $('cFeat').checked = !!ev.featured;
+    $('cHide').checked = !!ev.hidden;
+    $('cErr').textContent = '';
+    $('cLink').hidden = !ev.url;
+    if (ev.url) $('cLink').href = ev.url;
+    $('cDialog').showModal();
+  }
+  $('cClose').addEventListener('click', () => $('cDialog').close());
+  $('cForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await api(`/api/events/${state.editing.id}/county`, { method: 'PUT', body: { location_id: $('cLoc').value, featured: $('cFeat').checked, hidden: $('cHide').checked } });
+      $('cDialog').close();
+      await loadInfo();
+      await loadEvents();
+    } catch (err) {
+      guard(err, $('cErr'));
+    }
+  });
+  $('countySync').addEventListener('click', async () => {
+    $('countySync').disabled = true;
+    $('countyStatus').textContent = 'Syncing…';
+    try {
+      await api('/api/county/sync', { method: 'POST' });
+      await loadSettings();
+      await loadInfo();
+      await loadEvents();
+    } catch (err) {
+      guard(err, $('setErr'));
+    }
+    $('countySync').disabled = false;
+  });
 
   $('evForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -296,6 +355,7 @@
       await api('/api/settings', { method: 'PUT', body: {
         fair_name: $('sName').value, fair_start: $('sStart').value, fair_end: $('sEnd').value,
         kiosk_speed: $('sSpeed').value, mist_sdk_token: $('sMist').value,
+        county_feed_enabled: $('sCountyOn').checked ? '1' : '0', county_feed_url: $('sCountyUrl').value,
       } });
       await loadInfo();
       await loadSettings();

@@ -50,12 +50,27 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS events_date ON events(date, start_time);
 `);
 
+// Added 2026-10-30 for the county calendar import.
+const eventCols = new Set(db.prepare('PRAGMA table_info(events)').all().map((c) => c.name));
+for (const [col, def] of [
+  ['source', "TEXT NOT NULL DEFAULT 'manual'"], // 'manual' (admin page) or 'county' (iCal feed)
+  ['ext_uid', 'TEXT'],
+  ['all_day', 'INTEGER NOT NULL DEFAULT 0'],
+  ['hidden', 'INTEGER NOT NULL DEFAULT 0'],    // admins can hide an imported event; survives re-syncs
+  ['url', 'TEXT'],
+]) {
+  if (!eventCols.has(col)) db.exec(`ALTER TABLE events ADD COLUMN ${col} ${def}`);
+}
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS events_ext ON events(source, ext_uid)');
+
 const DEFAULT_SETTINGS = {
   fair_name: 'Montana State Fair',
   fair_start: '',
   fair_end: '',
   kiosk_speed: '40',
   mist_sdk_token: '',
+  county_feed_url: 'https://www.cascadecountymt.gov/common/modules/iCalendar/iCalendar.aspx?catID=24&feed=calendar',
+  county_feed_enabled: '1',
 };
 
 function getSettings() {

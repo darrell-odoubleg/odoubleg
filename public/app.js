@@ -20,8 +20,9 @@
   // ---------- schedule ----------
   function renderDays() {
     const today = MSF.now().date;
+    const fairDays = new Set(state.info.fair_days || []);
     $('days').innerHTML = state.info.days.map((d) => `
-      <button class="day${d === today ? ' today' : ''}" data-day="${d}" aria-selected="${d === state.day}">
+      <button class="day${d === today ? ' today' : ''}${fairDays.has(d) ? ' fair' : ''}" data-day="${d}" aria-selected="${d === state.day}">
         <small>${fmtDay(d, { weekday: 'short' })}</small><b>${fmtDay(d, { month: 'short', day: 'numeric' })}</b>
       </button>`).join('') || '<span class="sub">No fair days set yet</span>';
     const sel = $('days').querySelector('[aria-selected="true"]');
@@ -64,7 +65,7 @@
     const mapped = e.map_id && e.x != null;
     return `
       <article class="event ${s}${state.open === e.id ? ' open' : ''}" style="--cat:${c.color}" data-id="${e.id}">
-        <div class="time">${fmtTime(e.start_time)}${e.end_time ? `<small>to ${fmtTime(e.end_time)}</small>` : ''}</div>
+        <div class="time">${e.all_day ? 'All day' : fmtTime(e.start_time)}${e.end_time && !e.all_day ? `<small>to ${fmtTime(e.end_time)}</small>` : ''}</div>
         <div>
           <h3>${esc(e.title)}</h3>
           <div class="meta">
@@ -74,7 +75,10 @@
             <span>${esc(where(e) || c.label)}</span>
           </div>
           ${e.description ? `<div class="desc">${esc(e.description)}</div>` : ''}
-          ${mapped ? `<div class="actions"><button class="btn primary" data-go="${e.location_id}">${native ? 'Directions' : 'Show on map'}</button></div>` : ''}
+          ${mapped || e.url ? `<div class="actions">
+            ${mapped ? `<button class="btn primary" data-go="${e.location_id}">${native ? 'Directions' : 'Show on map'}</button>` : ''}
+            ${e.url ? `<a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener">More info</a>` : ''}
+          </div>` : ''}
         </div>
       </article>`;
   }
@@ -200,6 +204,7 @@
   }
 
   document.addEventListener('click', (e) => {
+    if (e.target.closest('a[href]')) return;
     const t = e.target.closest('[data-day],[data-cat],[data-view],[data-go],[data-route],.event');
     if (!t) return;
     if (t.dataset.day) return loadDay(t.dataset.day);
@@ -231,9 +236,8 @@
     const info = await MSF.api('/api/info');
     state.info = info;
     MSF.setNow(info.now);
-    $('fairName').textContent = info.fair_name;
     document.title = `${info.fair_name} Events`;
-    if (info.fair_start && info.fair_end) $('subline').textContent = `${fmtDay(info.fair_start, { month: 'long', day: 'numeric' })} – ${fmtDay(info.fair_end, { month: 'long', day: 'numeric', year: 'numeric' })}`;
+    if (info.fair_start && info.fair_end) $('subline').textContent = `Fair: ${fmtDay(info.fair_start, { month: 'short', day: 'numeric' })} – ${fmtDay(info.fair_end, { month: 'short', day: 'numeric', year: 'numeric' })} · Montana ExpoPark`;
     $('apkBanner').hidden = !info.apk || native || !/Android/i.test(navigator.userAgent);
     const today = info.now.date;
     const day = info.days.includes(today) ? today : (info.days.find((d) => d > today) || info.days[info.days.length - 1] || today);

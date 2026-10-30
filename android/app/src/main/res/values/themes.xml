@@ -1,9 +1,9 @@
 <resources>
-    <color name="navy">#12284B</color>
-    <color name="gold">#F2A900</color>
+    <color name="navy">#353653</color>
+    <color name="accent">#E4332D</color>
     <style name="Theme.MSF" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="colorPrimary">@color/navy</item>
-        <item name="colorAccent">@color/gold</item>
+        <item name="colorAccent">@color/accent</item>
         <item name="android:statusBarColor">@color/navy</item>
         <item name="android:navigationBarColor">@color/navy</item>
         <item name="android:windowBackground">@color/navy</item>

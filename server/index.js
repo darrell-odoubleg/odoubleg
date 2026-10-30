@@ -5,6 +5,7 @@ const express = require('express');
 const session = require('express-session');
 const { db, getSettings, setSetting, DEFAULT_SETTINGS, checkPassword } = require('./db');
 const mist = require('./mist');
+const county = require('./countyFeed');
 
 const PORT = process.env.PORT || 4400;
 const TZ = process.env.TZ_NAME || 'America/Denver';
@@ -66,10 +67,17 @@ function dateRange(start, end) {
   return out;
 }
 
-function fairDays(s = getSettings()) {
-  const days = dateRange(s.fair_start, s.fair_end);
-  if (days.length) return days;
-  return db.prepare('SELECT DISTINCT date FROM events ORDER BY date').all().map((r) => r.date);
+// Public events: not hidden, and county imports only while the feed is switched on.
+function visibleWhere(s = getSettings()) {
+  return s.county_feed_enabled === '0' ? "e.hidden = 0 AND e.source <> 'county'" : 'e.hidden = 0';
+}
+
+// Day tabs: every fair day, plus upcoming days that have something on at the ExpoPark.
+function scheduleDays(s = getSettings()) {
+  const fair = dateRange(s.fair_start, s.fair_end);
+  const upcoming = db.prepare(`SELECT DISTINCT e.date FROM events e WHERE ${visibleWhere(s)} AND e.date >= ? ORDER BY e.date LIMIT 45`)
+    .all(localNow().date).map((r) => r.date);
+  return [...new Set([...fair, ...upcoming])].sort();
 }
 
 const EVENT_SELECT = `
@@ -79,6 +87,8 @@ const EVENT_SELECT = `
 function cleanEvent(b) {
   const title = String(b.title || '').trim();
   if (!title) throw new Error('Title is required');
+  const allDay = b.all_day ? 1 : 0;
+  if (allDay) { b.start_time = '00:00'; b.end_time = ''; }
   if (!TIME_RE.test(b.start_time || '')) throw new Error('Start time is required');
   if (b.end_time && !TIME_RE.test(b.end_time)) throw new Error('End time is not valid');
   const locId = b.location_id ? Number(b.location_id) : null;
@@ -88,6 +98,7 @@ function cleanEvent(b) {
     description: String(b.description || '').trim().slice(0, 4000) || null,
     start_time: b.start_time,
     end_time: b.end_time || null,
+    all_day: allDay,
     location_id: locId,
     location_text: String(b.location_text || '').trim().slice(0, 200) || null,
     category: String(b.category || '').trim().slice(0, 40) || null,
@@ -161,22 +172,26 @@ app.get('/api/info', (req, res) => {
     fair_start: s.fair_start,
     fair_end: s.fair_end,
     kiosk_speed: Number(s.kiosk_speed) || 40,
-    days: fairDays(s),
+    days: scheduleDays(s),
+    fair_days: dateRange(s.fair_start, s.fair_end),
     now: localNow(),
     tz: TZ,
     apk: fs.existsSync(path.join(APK_DIR, 'msf.apk')),
   });
 });
 
+// ?all=1 (signed-in admins only) includes hidden events.
 app.get('/api/events', (req, res) => {
   const { date, from, to } = req.query;
+  const vis = req.query.all === '1' && currentUser(req) ? '1 = 1' : visibleWhere();
+  const order = 'ORDER BY e.date, e.all_day DESC, e.start_time, e.title';
   let rows;
   if (DATE_RE.test(date || '')) {
-    rows = db.prepare(`${EVENT_SELECT} WHERE e.date = ? ORDER BY e.start_time, e.title`).all(date);
+    rows = db.prepare(`${EVENT_SELECT} WHERE ${vis} AND e.date = ? ${order}`).all(date);
   } else if (DATE_RE.test(from || '') && DATE_RE.test(to || '')) {
-    rows = db.prepare(`${EVENT_SELECT} WHERE e.date BETWEEN ? AND ? ORDER BY e.date, e.start_time, e.title`).all(from, to);
+    rows = db.prepare(`${EVENT_SELECT} WHERE ${vis} AND e.date BETWEEN ? AND ? ${order}`).all(from, to);
   } else {
-    rows = db.prepare(`${EVENT_SELECT} ORDER BY e.date, e.start_time, e.title`).all();
+    rows = db.prepare(`${EVENT_SELECT} WHERE ${vis} ${order}`).all();
   }
   res.set('Cache-Control', 'no-store').json({ events: rows, now: localNow() });
 });
@@ -231,8 +246,8 @@ app.get('/download', (req, res) => {
 
 // ---------- admin API ----------
 const insertEvent = db.prepare(`INSERT INTO events
-  (title, description, date, start_time, end_time, location_id, location_text, category, featured, cancelled)
-  VALUES (@title, @description, @date, @start_time, @end_time, @location_id, @location_text, @category, @featured, @cancelled)`);
+  (title, description, date, start_time, end_time, all_day, location_id, location_text, category, featured, cancelled)
+  VALUES (@title, @description, @date, @start_time, @end_time, @all_day, @location_id, @location_text, @category, @featured, @cancelled)`);
 
 // One request can add the same event on several days (daily shows, multiple performances).
 app.post('/api/events', requireAdmin, (req, res) => {
@@ -251,8 +266,10 @@ app.put('/api/events/:id', requireAdmin, (req, res) => {
   try {
     const ev = cleanEvent(req.body);
     if (!DATE_RE.test(req.body.date || '')) throw new Error('Date is required');
+    const cur = db.prepare('SELECT source FROM events WHERE id = ?').get(Number(req.params.id));
+    if (cur && cur.source === 'county') throw new Error('County calendar events update from the feed. You can hide them or set their map location.');
     const r = db.prepare(`UPDATE events SET title=@title, description=@description, date=@date, start_time=@start_time,
-      end_time=@end_time, location_id=@location_id, location_text=@location_text, category=@category,
+      end_time=@end_time, all_day=@all_day, location_id=@location_id, location_text=@location_text, category=@category,
       featured=@featured, cancelled=@cancelled, updated_at=datetime('now') WHERE id=@id`)
       .run({ ...ev, date: req.body.date, id: Number(req.params.id) });
     if (!r.changes) return res.status(404).json({ error: 'Event not found' });
@@ -263,8 +280,23 @@ app.put('/api/events/:id', requireAdmin, (req, res) => {
 });
 
 app.delete('/api/events/:id', requireAdmin, (req, res) => {
-  db.prepare('DELETE FROM events WHERE id = ?').run(Number(req.params.id));
+  db.prepare("DELETE FROM events WHERE id = ? AND source <> 'county'").run(Number(req.params.id));
   res.json({ ok: true });
+});
+
+// Imported events can't be edited (the next sync would undo it), but they can be hidden or pinned to a mapped location.
+app.put('/api/events/:id/county', requireAdmin, (req, res) => {
+  const b = req.body || {};
+  const locId = b.location_id ? Number(b.location_id) : null;
+  if (locId && !db.prepare('SELECT 1 FROM locations WHERE id = ?').get(locId)) return res.status(400).json({ error: 'Unknown location' });
+  const r = db.prepare("UPDATE events SET hidden = ?, featured = ?, location_id = ? WHERE id = ? AND source = 'county'")
+    .run(b.hidden ? 1 : 0, b.featured ? 1 : 0, locId, Number(req.params.id));
+  if (!r.changes) return res.status(404).json({ error: 'Event not found' });
+  res.json({ ok: true });
+});
+
+app.post('/api/county/sync', requireAdmin, async (req, res) => {
+  res.json(await county.sync());
 });
 
 app.post('/api/locations', requireAdmin, (req, res) => {
@@ -301,10 +333,14 @@ app.put('/api/settings', requireAdmin, (req, res) => {
     if (b[k] && !DATE_RE.test(b[k])) return res.status(400).json({ error: 'Dates must be YYYY-MM-DD' });
   }
   if (b.fair_start && b.fair_end && b.fair_end < b.fair_start) return res.status(400).json({ error: 'The fair ends before it starts' });
+  if (b.county_feed_url && !/^https:\/\//.test(b.county_feed_url)) return res.status(400).json({ error: 'The calendar link must start with https://' });
+  const before = getSettings();
   for (const k of Object.keys(DEFAULT_SETTINGS)) {
     if (k in b) setSetting(k, String(b[k] ?? '').trim().slice(0, 500));
   }
-  res.json({ settings: getSettings() });
+  const after = getSettings();
+  if (after.county_feed_url !== before.county_feed_url) county.sync();
+  res.json({ settings: after });
 });
 
 // ---------- pages ----------
@@ -312,4 +348,7 @@ app.get('/kiosk', (req, res) => res.sendFile(path.join(__dirname, '..', 'public'
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')));
 app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
 
-app.listen(PORT, '127.0.0.1', () => console.log(`msf-odoubleg listening on 127.0.0.1:${PORT}`));
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`msf-odoubleg listening on 127.0.0.1:${PORT}`);
+  county.start();
+});
