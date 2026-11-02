@@ -48,7 +48,18 @@ app.use(session({
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+// Demo clock (admin Settings): the whole site, kiosk included, acts as if it's that fair-local
+// time, and the clock keeps running from there. Used to demo with past fair schedules.
+function demoNow(s = getSettings()) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s.demo_clock || '')) return null;
+  const t = new Date(s.demo_clock + ':00Z').getTime() + Math.max(0, Date.now() - (Number(s.demo_set_at) || Date.now()));
+  const iso = new Date(t).toISOString();
+  return { date: iso.slice(0, 10), time: iso.slice(11, 16), demo: true };
+}
+
 function localNow() {
+  const demo = demoNow();
+  if (demo) return demo;
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
     timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).formatToParts(new Date()).map((p) => [p.type, p.value]));
@@ -340,10 +351,13 @@ app.put('/api/settings', requireAdmin, (req, res) => {
   }
   if (b.fair_start && b.fair_end && b.fair_end < b.fair_start) return res.status(400).json({ error: 'The fair ends before it starts' });
   if (b.county_feed_url && !/^https:\/\//.test(b.county_feed_url)) return res.status(400).json({ error: 'The calendar link must start with https://' });
+  if (b.demo_clock && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(b.demo_clock)) return res.status(400).json({ error: 'Demo clock must be a date and time' });
   const before = getSettings();
+  delete b.demo_set_at;
   for (const k of Object.keys(DEFAULT_SETTINGS)) {
     if (k in b) setSetting(k, String(b[k] ?? '').trim().slice(0, 500));
   }
+  if ('demo_clock' in b && (b.demo_clock || '') !== before.demo_clock) setSetting('demo_set_at', String(Date.now()));
   const after = getSettings();
   if (after.county_feed_url !== before.county_feed_url) county.sync();
   res.json({ settings: after });
@@ -352,6 +366,8 @@ app.put('/api/settings', requireAdmin, (req, res) => {
 // ---------- pages ----------
 app.get('/kiosk', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'kiosk.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')));
+// The 2026 Fair Guide flip book (its page images are in public/guide/).
+app.get('/guide', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'guide.html')));
 app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
 
 app.listen(PORT, '127.0.0.1', () => {

@@ -70,6 +70,7 @@
     $('sStart').value = s.fair_start;
     $('sEnd').value = s.fair_end;
     $('sSpeed').value = s.kiosk_speed;
+    $('sDemo').value = s.demo_clock || '';
     $('sMist').value = s.mist_sdk_token;
     $('sCountyOn').checked = s.county_feed_enabled !== '0';
     $('sCountyUrl').value = s.county_feed_url;
@@ -95,7 +96,7 @@
         <td>${fmtDay(e.date)}</td>
         <td style="white-space:nowrap">${fmtRange(e)}</td>
         <td${e.hidden ? ' style="opacity:.5"' : ''}><b>${esc(e.title)}</b>${e.cancelled ? ' <span class="badge cancel">Cancelled</span>' : ''}${e.featured ? ' <span class="badge feat">Featured</span>' : ''}${e.hidden ? ' <span class="badge cancel">Hidden</span>' : ''}
-          <div class="muted">${esc(category(e.category).label)}${e.source === 'county' ? ' · County calendar' : ''}</div></td>
+          <div class="muted">${esc(category(e.category).label)}${e.source === 'county' ? ' · County calendar' : e.source === 'guide' ? ' · 2026 Fair Guide' : ''}</div></td>
         <td>${esc(MSF.where(e))}</td>
         <td style="white-space:nowrap"><button class="btn" data-edit="${e.id}">Edit</button></td>
       </tr>`).join('') || `<tr><td colspan="5" class="muted" style="padding:20px">${state.events.length ? 'No events match.' : 'No events yet. Set the fair dates in Settings, then add events.'}</td></tr>`;
@@ -350,13 +351,15 @@
   });
 
   // ---------- settings ----------
+  $('demoFair').addEventListener('click', () => { $('sDemo').value = '2026-07-25T18:45'; });
+  $('demoOff').addEventListener('click', () => { $('sDemo').value = ''; });
   $('setForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     $('setErr').textContent = '';
     try {
       await api('/api/settings', { method: 'PUT', body: {
         fair_name: $('sName').value, fair_start: $('sStart').value, fair_end: $('sEnd').value,
-        kiosk_speed: $('sSpeed').value, mist_sdk_token: $('sMist').value,
+        kiosk_speed: $('sSpeed').value, mist_sdk_token: $('sMist').value, demo_clock: $('sDemo').value.slice(0, 16),
         county_feed_enabled: $('sCountyOn').checked ? '1' : '0', county_feed_url: $('sCountyUrl').value,
       } });
       await loadInfo();

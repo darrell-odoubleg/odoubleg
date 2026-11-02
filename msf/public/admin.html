@@ -115,6 +115,14 @@
           <div><label for="sEnd">Last day</label><input type="date" id="sEnd"></div>
         </div>
         <label for="sSpeed">Kiosk scroll speed (pixels per second)</label><input type="number" id="sSpeed" min="5" max="300">
+        <h3>Demo clock</h3>
+        <label for="sDemo">Pretend it's this date and time</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="datetime-local" id="sDemo" style="flex:1;min-width:220px">
+          <button class="btn" type="button" id="demoFair">2026 fair, Sat 7/25 6:45 PM</button>
+          <button class="btn" type="button" id="demoOff">Turn off</button>
+        </div>
+        <p class="muted">For demos with a past schedule, such as the 2026 Fair Guide. The website and every kiosk screen act as if it's this time, and the clock keeps running from there. Leave it empty to use the real date and time.</p>
         <h3>County calendar</h3>
         <label class="flags" style="margin:0"><span style="display:inline-flex;gap:6px;align-items:center;color:var(--ink);font-weight:500"><input type="checkbox" id="sCountyOn"> Show ExpoPark events from the Cascade County calendar</span></label>
         <label for="sCountyUrl">Calendar feed link (iCal)</label><input type="text" id="sCountyUrl">

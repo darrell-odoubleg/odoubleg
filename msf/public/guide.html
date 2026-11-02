@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>2026 Fair Guide</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+  /* The 2026 Montana State Fair Guide as a flip-through book.
+     ?auto=8 turns a page every 8 seconds and loops (for a digital screen); ?page=13 opens at a page. */
+  :root { --bg: #1b1c2c; --bar: #000; --ink: #fff; --muted: #b9bbd0; --accent: #e4332d; --btn: #353653;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  header { background: var(--bar); border-bottom: 4px solid var(--accent); display: flex; align-items: center; gap: 10px; padding: 8px 16px; flex-wrap: wrap; }
+  header a.back { color: #cfd0e0; text-decoration: none; font-weight: 600; white-space: nowrap; }
+  header h1 { font-size: 1.05rem; margin: 0 auto 0 4px; }
+  .btn { background: var(--btn); color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; font: inherit; font-weight: 600; cursor: pointer; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .count { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 6.5em; text-align: center; }
+  .stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 14px 16px; min-height: 0; }
+  #book { margin: 0 auto; }
+  .page { background: #fff; overflow: hidden; }
+  .page img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
+  .hint { text-align: center; color: var(--muted); font-size: .85rem; padding: 0 16px 12px; }
+  .loading { color: var(--muted); }
+  /* Screen mode (?auto=): just the book */
+  body.screen header, body.screen .hint { display: none; }
+  body.screen { cursor: none; }
+  body.screen .stage { padding: 2vh 2vw; }
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="/">‹ Schedule</a>
+  <h1>2026 Montana State Fair Guide</h1>
+  <button class="btn" id="prev" aria-label="Previous page">‹ Prev</button>
+  <span class="count" id="count" aria-live="polite"></span>
+  <button class="btn" id="next" aria-label="Next page">Next ›</button>
+  <button class="btn" id="full" title="Full screen">⛶</button>
+</header>
+<div class="stage" id="stage"><div id="book"><span class="loading">Loading the guide…</span></div></div>
+<p class="hint">Swipe, drag a page corner, or use the arrow keys to turn pages.</p>
+
+<script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+<script>
+(() => {
+  const PAGES = 24;
+  const W = 1000, H = 1545; // page image size (5.5 × 8.5 in)
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const auto = Math.max(0, Number(params.get('auto')) || 0);
+  const startPage = Math.min(PAGES, Math.max(1, Number(params.get('page')) || 1)) - 1;
+  if (auto) document.body.classList.add('screen');
+
+  const book = $('book');
+  book.innerHTML = '';
+  for (let i = 1; i <= PAGES; i++) {
+    const n = String(i).padStart(2, '0');
+    const page = document.createElement('div');
+    page.className = 'page';
+    // The cover and the back are single "hard" pages.
+    if (i === 1 || i === PAGES) page.dataset.density = 'hard';
+    page.innerHTML = `<img src="/guide/p-${n}.jpg" alt="Fair Guide page ${i}" ${i > 4 ? 'loading="lazy"' : ''} width="${W}" height="${H}">`;
+    book.appendChild(page);
+  }
+
+  // Size the book to fit the screen: two pages side by side when wide, one when narrow.
+  function fitSize() {
+    const s = $('stage');
+    const availH = s.clientHeight - 28, availW = s.clientWidth - 32;
+    const spread = availW > availH * (W / H) * 1.5;
+    const h = Math.min(availH, (spread ? availW / 2 : availW) * H / W);
+    return { w: Math.floor(h * W / H), h: Math.floor(h) };
+  }
+  const size = fitSize();
+  const flip = new St.PageFlip(book, {
+    width: size.w, height: size.h, size: 'fixed',
+    showCover: true, usePortrait: true, mobileScrollSupport: false,
+    maxShadowOpacity: 0.45, flippingTime: 800, startPage,
+  });
+  flip.loadFromHTML(document.querySelectorAll('.page'));
+
+  function update() {
+    const i = flip.getCurrentPageIndex();
+    const portrait = flip.getOrientation() === 'portrait';
+    // In a two-page spread, show both page numbers.
+    const label = portrait || i === 0 || i >= PAGES - 1 ? `${i + 1}` : `${i + 1}–${Math.min(i + 2, PAGES)}`;
+    $('count').textContent = `Page ${label} of ${PAGES}`;
+    $('prev').disabled = i === 0;
+    $('next').disabled = i >= PAGES - (portrait ? 1 : 2) && i !== 0;
+  }
+  flip.on('flip', update);
+  flip.on('changeOrientation', update);
+  update();
+
+  $('prev').addEventListener('click', () => flip.flipPrev());
+  $('next').addEventListener('click', () => flip.flipNext());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); flip.flipNext(); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); flip.flipPrev(); }
+  });
+  $('full').addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {});
+  });
+
+  // A new screen width (rotating a phone, resizing a window) needs a new book size: rebuild at
+  // the current page. Height-only changes (a phone's address bar sliding away) are ignored.
+  let resizeT = null, lastW = window.innerWidth;
+  window.addEventListener('resize', () => {
+    if (Math.abs(window.innerWidth - lastW) < 40) return;
+    lastW = window.innerWidth;
+    clearTimeout(resizeT);
+    resizeT = setTimeout(() => {
+      const at = flip.getCurrentPageIndex();
+      const params2 = new URLSearchParams(location.search);
+      params2.set('page', at + 1);
+      history.replaceState(null, '', `${location.pathname}?${params2}`);
+      location.reload();
+    }, 400);
+  });
+
+  // Screen mode: turn a page every few seconds, and start over at the end.
+  if (auto) {
+    setInterval(() => {
+      const portrait = flip.getOrientation() === 'portrait';
+      const i = flip.getCurrentPageIndex();
+      if (i >= PAGES - (portrait ? 1 : 2) && i !== 0) flip.turnToPage(0); else flip.flipNext();
+    }, auto * 1000);
+  }
+})();
+</script>
+</body>
+</html>
