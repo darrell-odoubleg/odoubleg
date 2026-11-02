@@ -61,6 +61,22 @@ a { color: inherit; }
 }
 .tabbtn[aria-selected="true"] { background: rgba(255,255,255,.14); color: #fff; }
 
+/* Jump to the fair, today, or any date from a calendar */
+.jump { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: 860px; margin: 12px auto 0; }
+.jumpbtn {
+  border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); color: #fff; border-radius: 999px;
+  padding: 6px 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.jumpbtn.fairbtn { background: var(--accent); border-color: var(--accent); }
+.jumpbtn.fairbtn span { font-weight: 500; opacity: .9; margin-left: 4px; }
+.jumpbtn[aria-pressed="true"] { box-shadow: 0 0 0 2px #fff inset; }
+.pick { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: .8rem; color: #cfd0e0; }
+.pick input {
+  color-scheme: dark; background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.35);
+  border-radius: 8px; padding: 5px 8px; font-weight: 600; min-height: 34px;
+}
+@media (max-width: 480px) { .pick { margin-left: 0; } .pick span { display: none; } }
+
 .days {
   display: flex; gap: 6px; overflow-x: auto; padding: 12px 0; max-width: 860px; margin: 0 auto;
   scrollbar-width: none; scroll-snap-type: x proximity;
