@@ -71,6 +71,8 @@ const DEFAULT_SETTINGS = {
   mist_sdk_token: '',
   county_feed_url: 'https://www.cascadecountymt.gov/common/modules/iCalendar/iCalendar.aspx?catID=24&feed=calendar',
   county_feed_enabled: '1',
+  demo_clock: '',      // 'YYYY-MM-DDTHH:MM' fair-local: the site acts as if it's this time, then runs on from it
+  demo_set_at: '',     // when demo_clock was set (ms), so the demo clock keeps moving
 };
 
 function getSettings() {

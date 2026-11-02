@@ -6,7 +6,8 @@
 <title>Fair Events Kiosk</title>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
-  /* Options in the URL: ?speed=40 (px/sec) &location=<id> &category=<id> &theme=light &day=YYYY-MM-DD */
+  /* Options in the URL: ?speed=40 (px/sec) &location=<id> &category=<id> &theme=light &day=YYYY-MM-DD
+     &at=YYYY-MM-DDTHH:MM (this screen only: act as if it's that time, e.g. a 2026 fair demo) */
   :root {
     /* Montana ExpoPark logo colors */
     --bg: #1b1c2c; --panel: #353653; --card: #2a2b44; --ink: #ffffff; --muted: #b9bbd0; --accent: #e4332d; --line: #3a3c5c;
@@ -54,6 +55,15 @@
   .empty { color: var(--muted); font-size: 1.4rem; text-align: center; padding: 4rem 1rem; }
   footer { display: flex; justify-content: space-between; padding: .55rem 1.6rem; font-size: .9rem; color: var(--muted); border-top: 1px solid var(--line); }
   footer b { color: #ff6b63; }
+  .demo { background: #e4332d; color: #fff; font-weight: 800; letter-spacing: .1em; padding: .05rem .5rem; border-radius: .3rem; margin-right: .6rem; }
+  /* Tonight's headliners: the big billboard line */
+  .spot { display: flex; gap: .8rem; padding: .9rem 1.6rem 0; flex-wrap: wrap; }
+  .spot-card { flex: 1 1 22rem; background: linear-gradient(120deg, #353653, #23243a); color: #fff; border-radius: .9rem; padding: .9rem 1.3rem;
+    border-left: .6rem solid var(--accent); display: flex; align-items: center; gap: 1.2rem; }
+  .spot-card .k { font-size: .85rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #ff6b63; }
+  .spot-card .t { font-size: 2.1rem; font-weight: 900; line-height: 1.05; text-transform: uppercase; letter-spacing: .01em; }
+  .spot-card .w { color: #d6d7e6; margin-top: .2rem; }
+  .spot-card .tm { margin-left: auto; font-size: 2rem; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
   :root[data-theme="light"] footer b, :root[data-theme="light"] .day-break { color: var(--accent); }
 </style>
 </head>
@@ -65,6 +75,7 @@
     <div class="date" id="date"></div>
   </div>
 </header>
+<section class="spot" id="spot" hidden></section>
 <section class="now-band" id="nowBand" hidden>
   <h2>Happening now</h2>
   <div class="now-grid" id="nowGrid"></div>
@@ -83,12 +94,19 @@
   const fLoc = params.get('location');
   const fCat = params.get('category');
   const fixedDay = params.get('day');
+  // ?at=: this screen keeps its own demo clock, running on from the given time.
+  const at = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(params.get('at') || '') ? params.get('at') : null;
+  if (at) MSF.setNow({ date: at.slice(0, 10), time: at.slice(11, 16), demo: true });
+  const setNow = (n) => { if (!at) MSF.setNow(n); };
   let speed = Number(params.get('speed')) || 0;
   let info = null;
   let html = '';
   let offset = 0;
   let loopH = 0;
   let pauseUntil = 0;
+  let lastSpot = null;
+
+  const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 
   function filter(list) {
     return list.filter((e) => (!fLoc || String(e.location_id) === fLoc) && (!fCat || (e.category || 'other') === fCat));
@@ -107,7 +125,7 @@
   async function refresh() {
     try {
       info = await MSF.api('/api/info');
-      MSF.setNow(info.now);
+      setNow(info.now);
       if (!speed) speed = info.kiosk_speed;
       const n = MSF.now();
       const day = fixedDay || n.date;
@@ -115,15 +133,26 @@
       const next = new Date(day + 'T12:00:00Z'); next.setUTCDate(next.getUTCDate() + 1);
       const nextDay = next.toISOString().slice(0, 10);
       const r = await MSF.api(`/api/events?from=${day}&to=${nextDay}`);
-      MSF.setNow(r.now);
+      setNow(r.now);
       const all = filter(r.events);
       const todays = all.filter((e) => e.date === day);
-      const now = todays.filter((e) => status(e) === 'now');
+      // Headliners first, then the shortest (so all-day displays don't crowd out what's on now).
+      const len = (e) => e.all_day ? 1440 : e.end_time ? (e.end_time < e.start_time ? 1440 : toMin(e.end_time) - toMin(e.start_time)) : 30;
+      const now = todays.filter((e) => status(e) === 'now').sort((a, b) => (b.featured - a.featured) || (len(a) - len(b)));
+      // Tonight's headliners that haven't started yet.
+      const spot = todays.filter((e) => e.featured && !e.cancelled && status(e) === 'upcoming').slice(0, 2);
+      $('spot').hidden = !spot.length;
+      $('spot').innerHTML = spot.map((e) => `
+        <div class="spot-card"><div><div class="k">${e.start_time >= '17:00' ? 'Tonight' : 'Today'}</div><div class="t">${esc(e.title)}</div>
+        <div class="w">${esc(where(e))}</div></div><div class="tm">${fmtTime(e.start_time)}</div></div>`).join('');
+      const spotKey = spot.map((e) => e.id).join();
+      if (spotKey !== lastSpot) { lastSpot = spotKey; html = ''; } // the list area changed size: re-measure
       const upcoming = todays.filter((e) => fixedDay || status(e) === 'upcoming' || (e.cancelled && e.start_time >= n.time));
       const tomorrow = all.filter((e) => e.date === nextDay);
 
       $('nowBand').hidden = !now.length;
-      $('nowGrid').innerHTML = now.slice(0, 6).map((e) => `
+      // With a headliner spotlight up, one row of "now" cards, so the coming-up list still shows.
+      $('nowGrid').innerHTML = now.slice(0, spot.length ? 3 : 6).map((e) => `
         <div class="now-card"><div class="t">${esc(e.title)}</div><div class="w">${esc(where(e))}</div>
         <div class="tm">${e.all_day ? 'All day' : e.end_time ? `Until ${fmtTime(e.end_time)}` : `Started ${fmtTime(e.start_time)}`}</div></div>`).join('');
 
@@ -132,7 +161,8 @@
       if (tomorrow.length && (!fixedDay || !upcoming.length)) out += `<div class="day-break">${fmtDay(nextDay, { weekday: 'long', month: 'long', day: 'numeric' })}</div>` + tomorrow.map(row).join('');
       if (!out) out = `<div class="empty">${now.length ? '' : 'No more events scheduled. See you at the fair!'}</div>`;
       if (out !== html) { html = out; build(); }
-      $('updated').textContent = `Updated ${fmtTime(MSF.now().time)}`;
+      const demo = at || (info.now && info.now.demo);
+      $('updated').innerHTML = `${demo ? '<span class="demo">DEMO</span>' : ''}Updated ${fmtTime(MSF.now().time)}`;
     } catch (err) {
       $('updated').textContent = 'Offline: showing last schedule';
     }
