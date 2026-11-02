@@ -152,7 +152,7 @@ function MapView(wrap, opts = {}) {
       img.height = m.height;
       svg.setAttribute('width', m.width);
       svg.setAttribute('height', m.height);
-      img.src = `/api/maps/${m.id}/image`;
+      img.src = `/api/maps/${m.id}/image${m.v ? `?v=${m.v}` : ''}`;
     },
     setPins(list) { pins = list || []; draw(); },
     setDot(d) { dot = d; draw(); },

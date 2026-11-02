@@ -211,10 +211,11 @@ app.get('/api/locations', (req, res) => {
   res.json({ locations: db.prepare('SELECT * FROM locations ORDER BY sort, name').all() });
 });
 
-// The printed fairgrounds map comes first; Mist floor plans follow. It has no real scale,
-// so ppm is 1 and location x/y on it are image pixels. Only Mist maps support indoor location.
-const FAIRGROUNDS_IMG = path.join(__dirname, '..', 'assets', 'fairgrounds-map.png');
-const FAIRGROUNDS = { id: 'fairgrounds', name: 'Fairgrounds', width: 1680, height: 1100, ppm: 1, width_m: 1680, height_m: 1100, wayfinding: [], static: true, center: [570, 640] };
+// The printed fairgrounds map (the 2026 Fair Guide's pages 2-3 as one image) comes first; Mist
+// floor plans follow. It has no real scale, so ppm is 1 and location x/y on it are image pixels.
+// Only Mist maps support indoor location. Bump v when the image changes so phones don't keep the old one.
+const FAIRGROUNDS_IMG = path.join(__dirname, '..', 'assets', 'fairgrounds-map-2026.jpg');
+const FAIRGROUNDS = { id: 'fairgrounds', name: 'Fairgrounds', width: 2400, height: 1855, ppm: 1, width_m: 2400, height_m: 1855, wayfinding: [], static: true, center: [800, 900], v: 2 };
 
 app.get('/api/maps', async (req, res) => {
   try {
