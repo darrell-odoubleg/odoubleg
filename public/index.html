@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#000000">
 <title>Montana State Fair Events</title>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles.css?v=2">
 </head>
 <body>
 <div class="hero"><img src="/msf-banner.jpg" srcset="/msf-banner-700.jpg 700w, /msf-banner.jpg 1400w" sizes="(max-width: 1100px) 100vw, 1100px" alt="Montana State Fair"></div>
@@ -22,6 +22,11 @@
       <button class="tabbtn" role="tab" aria-selected="false" data-view="map">Map</button>
       <a class="tabbtn" href="/guide" style="text-decoration:none">Fair Guide</a>
     </div>
+  </div>
+  <div class="jump" id="jump">
+    <button class="jumpbtn fairbtn" id="goFair" hidden>Fair <span id="fairRange"></span></button>
+    <button class="jumpbtn" id="goToday">Today</button>
+    <label class="pick"><span>Go to date</span><input type="date" id="pickDate" aria-label="Pick a date"></label>
   </div>
   <nav class="days" id="days" aria-label="Fair days"></nav>
 </header>
@@ -58,6 +63,6 @@
 
 <script src="/shared.js"></script>
 <script src="/mapview.js"></script>
-<script src="/app.js"></script>
+<script src="/app.js?v=2"></script>
 </body>
 </html>

@@ -21,12 +21,24 @@
   function renderDays() {
     const today = MSF.now().date;
     const fairDays = new Set(state.info.fair_days || []);
-    $('days').innerHTML = state.info.days.map((d) => `
+    // A date picked from the calendar gets its own tab, in order, while it's being shown.
+    const days = state.info.days.includes(state.day) ? state.info.days : [...state.info.days, state.day].sort();
+    $('days').innerHTML = days.map((d) => `
       <button class="day${d === today ? ' today' : ''}${fairDays.has(d) ? ' fair' : ''}" data-day="${d}" aria-selected="${d === state.day}">
         <small>${fmtDay(d, { weekday: 'short' })}</small><b>${fmtDay(d, { month: 'short', day: 'numeric' })}</b>
       </button>`).join('') || '<span class="sub">No fair days set yet</span>';
     const sel = $('days').querySelector('[aria-selected="true"]');
     if (sel) sel.scrollIntoView({ inline: 'center', block: 'nearest' });
+    $('pickDate').value = state.day;
+    $('goFair').setAttribute('aria-pressed', fairDays.has(state.day));
+    $('goToday').setAttribute('aria-pressed', state.day === today);
+  }
+
+  // The Fair button: today if the fair is on, otherwise its first day.
+  function fairDay() {
+    const fair = state.info.fair_days || [];
+    const today = MSF.now().date;
+    return fair.includes(today) ? today : fair[0];
   }
 
   function renderChips() {
@@ -217,6 +229,7 @@
     $('view-schedule').hidden = v !== 'schedule';
     $('view-map').hidden = v !== 'map';
     $('days').hidden = v !== 'schedule';
+    $('jump').hidden = v !== 'schedule';
     if (v === 'map') {
       loadMaps().then(() => mv.fit());
       if (native) native.startLocation();
@@ -241,6 +254,9 @@
       else t.classList.toggle('open');
     }
   });
+  $('goFair').addEventListener('click', () => { if (fairDay()) loadDay(fairDay()); });
+  $('goToday').addEventListener('click', () => loadDay(MSF.now().date));
+  $('pickDate').addEventListener('change', (e) => { if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) loadDay(e.target.value); });
   $('search').addEventListener('input', (e) => { state.q = e.target.value; renderList(); });
   $('mapPick').addEventListener('change', (e) => switchMap(state.maps.find((m) => m.id === e.target.value)));
   $('destPick').addEventListener('change', (e) => e.target.value && goTo(e.target.value));
@@ -262,8 +278,16 @@
     document.title = `${info.fair_name} Events`;
     if (info.fair_start && info.fair_end) $('subline').textContent = `Fair: ${fmtDay(info.fair_start, { month: 'short', day: 'numeric' })} – ${fmtDay(info.fair_end, { month: 'short', day: 'numeric', year: 'numeric' })} · Montana ExpoPark`;
     $('apkBanner').hidden = !info.apk || native || !/Android/i.test(navigator.userAgent);
+    if (info.fair_days && info.fair_days.length) {
+      $('goFair').hidden = false;
+      $('fairRange').textContent = `${fmtDay(info.fair_start, { month: 'short', day: 'numeric' })} – ${fmtDay(info.fair_end, { month: 'short', day: 'numeric' })}`;
+    }
     const today = info.now.date;
-    const day = info.days.includes(today) ? today : (info.days.find((d) => d > today) || info.days[info.days.length - 1] || today);
+    // ?date=YYYY-MM-DD opens that day; ?date=fair opens the fair.
+    const asked = new URLSearchParams(location.search).get('date');
+    let day = info.days.includes(today) ? today : (info.days.find((d) => d > today) || info.days[info.days.length - 1] || today);
+    if (asked === 'fair' && fairDay()) day = fairDay();
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(asked || '')) day = asked;
     await loadDay(day);
     if (new URLSearchParams(location.search).get('view') === 'map') setView('map');
     // Keep "now / coming up" fresh and pick up edits.
