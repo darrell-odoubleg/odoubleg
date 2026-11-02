@@ -26,6 +26,17 @@
   header .date { color: #d6d7e6; font-size: 1.15rem; }
   header .clock { font-size: 2.8rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; line-height: 1.1; }
   @media (orientation: portrait) { header img { height: 7rem; } }
+  /* Demo screens open narrow: a tall 9:16 billboard column, centered on a wide screen.
+     Sizes follow the column's width, not the screen's. (&wide=1 turns it off.) */
+  :root.narrow { --col: min(100vw, 56.25vh); font-size: clamp(11px, calc(var(--col) * .027), 34px); background: #000; }
+  :root.narrow body { width: var(--col); margin: 0 auto; box-shadow: 0 0 0 1px #2a2b44; }
+  :root.narrow header img { height: 6.5rem; }
+  :root.narrow header .clock { font-size: 2.4rem; }
+  :root.narrow .now-grid { grid-template-columns: 1fr; }
+  :root.narrow .spot-card { flex-wrap: wrap; }
+  :root.narrow .spot-card .tm { margin-left: 0; font-size: 1.6rem; }
+  :root.narrow .row { grid-template-columns: 6.5rem 1fr; }
+  :root.narrow .row .cat { display: none; }
   .now-band { padding: 1rem 1.6rem .4rem; }
   .now-band h2, .list-head { margin: 0 0 .6rem; font-size: .95rem; text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
   :root:not([data-theme="light"]) .now-band h2, :root:not([data-theme="light"]) .list-head { color: #ff6b63; }
@@ -97,6 +108,14 @@
   // ?at=: this screen keeps its own demo clock, running on from the given time.
   const at = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(params.get('at') || '') ? params.get('at') : null;
   if (at) MSF.setNow({ date: at.slice(0, 10), time: at.slice(11, 16), demo: true });
+  // Returns true when the layout changed (the list then needs measuring again).
+  const narrow = (demo) => {
+    const on = !!demo && params.get('wide') !== '1';
+    if (document.documentElement.classList.contains('narrow') === on) return false;
+    document.documentElement.classList.toggle('narrow', on);
+    return true;
+  };
+  narrow(at);
   const setNow = (n) => { if (!at) MSF.setNow(n); };
   let speed = Number(params.get('speed')) || 0;
   let info = null;
@@ -162,6 +181,7 @@
       if (!out) out = `<div class="empty">${now.length ? '' : 'No more events scheduled. See you at the fair!'}</div>`;
       if (out !== html) { html = out; build(); }
       const demo = at || (info.now && info.now.demo);
+      if (narrow(demo)) build();
       $('updated').innerHTML = `${demo ? '<span class="demo">DEMO</span>' : ''}Updated ${fmtTime(MSF.now().time)}`;
     } catch (err) {
       $('updated').textContent = 'Offline: showing last schedule';
