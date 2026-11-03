@@ -63,7 +63,7 @@
     F('original_hire_date', 'Original Hire Date', 'employment', 'date', { required: true }),
     F('adjusted_hire_date', 'Adjusted Hire Date', 'employment', 'date', { hint: 'Optional. For a break in service, to credit the earlier work period.' }),
     F('most_recent_hire_date', 'Most Recent Hire Date', 'employment', 'date', { hint: 'For a rehire. Blank = Equifax uses Original Hire Date.' }),
-    F('user_id', 'User ID', 'employment', 'text', { max: 64, hint: 'Unique ID per employee. No PII (not SSN/name/DOB).' }),
+    F('user_id', 'User ID', 'employment', 'text', { max: 64, hint: 'Unique ID per employee. No PII (not SSN/name/DOB). Records with the same User ID fill each other’s blank details.' }),
     F('pin', 'PIN', 'employment', 'digits', { max: 8, def: true, hint: 'Default PIN, 8 digits.' }),
     F('status', 'Employee Status', 'employment', 'code', { options: STATUS, def: true, required: true }),
     F('employee_type', 'Employee Type', 'employment', 'code', { options: EMP_TYPE, def: true, required: true }),
@@ -287,9 +287,12 @@
     const n = `${rec.first_name || ''} ${rec.last_name || ''}`.trim().toLowerCase().replace(/\s+/g, ' ');
     return n ? 'name:' + n : '';
   }
+  const userIdKey = rec => String(rec.user_id || '').trim().toLowerCase();
   function samePerson(a, b) {
     const sa = String(a.ssn || '').replace(/\D/g, ''), sb = String(b.ssn || '').replace(/\D/g, '');
     if (sa.length === 9 && sb.length === 9) return sa === sb;
+    const ua = userIdKey(a), ub = userIdKey(b);
+    if (ua && ub) return ua === ub;
     const na = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase(), nb = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
     return !!na && na === nb;
   }
@@ -307,7 +310,7 @@
 
   const api = {
     FIELDS, GROUPS, BY_KEY, PERSON_KEYS, STATUS, INACTIVE_STATUS, EMP_TYPE, PAY_FREQ, PAY_RATE, LOC_STATUS, STATES,
-    normalize, normalizeRecord, normDate, toIso, fromIso, dateKey, effective, validate, sumYtd, personKey, samePerson, exportFields, fileName,
+    normalize, normalizeRecord, normDate, toIso, fromIso, dateKey, effective, validate, sumYtd, personKey, samePerson, userIdKey, exportFields, fileName,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TWN = api;
