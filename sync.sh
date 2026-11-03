@@ -10,6 +10,7 @@ declare -A APPS=(
   [stock]=/var/www/stock-odoubleg
   [msf]=/var/www/msf-odoubleg
   [medreview]=/var/www/medreview-odoubleg
+  [equifax]=/var/www/equifax-odoubleg
 )
 for prefix in "${!APPS[@]}"; do
   src=${APPS[$prefix]}
