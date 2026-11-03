@@ -316,6 +316,7 @@ router.post('/merge', (req, res, next) => {
 
 // ---- export ----
 function selected(req) {
+  req = req.query ? req : { query: req };
   const ids = String(req.query.ids || '').split(',').map(Number).filter(Boolean);
   const from = TWN.toIso(TWN.normDate(req.query.from || '')), to = TWN.toIso(TWN.normDate(req.query.to || ''));
   return loadAll()
@@ -326,47 +327,101 @@ function selected(req) {
 
 const NUM_FMT = { money: '0.00', hours: '0.00', int: '0' };
 
+// -> { buffer, filename, type, rows, people, with_errors }
+async function buildExport(query) {
+  const settings = getSettings();
+  const fields = TWN.exportFields(settings.include_tci);
+  const recs = selected({ query });
+  const rows = recs.map(r => TWN.effective(r.data, settings));
+  const format = query.format === 'csv' ? 'csv' : 'xlsx';
+  const meta = {
+    filename: TWN.fileName(settings, format),
+    rows: rows.length,
+    people: new Set(rows.map(e => e.ssn || `${e.first_name} ${e.last_name}`)).size,
+    with_errors: recs.filter(r => TWN.validate(r.data, settings).errors.length).length,
+    file_type: settings.file_type,
+  };
+  if (format === 'csv') {
+    const q = v => /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+    const lines = [fields.map(f => q(f.label)).join(',')];
+    for (const e of rows) lines.push(fields.map(f => q(csvValue(f, e[f.key]))).join(','));
+    return { ...meta, type: 'text/csv', buffer: Buffer.from(lines.join('\r\n') + '\r\n', 'utf8') };
+  }
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'O Double G';
+  const ws = wb.addWorksheet('Sheet1'); // spec: one sheet, consistent name, usually "Sheet1"
+  ws.addRow(fields.map(f => f.label));
+  ws.getRow(1).font = { bold: true };
+  for (const e of rows) {
+    ws.addRow(fields.map(f => {
+      const v = e[f.key];
+      if (v === '') return null;
+      if (NUM_FMT[f.type] && !isNaN(Number(v))) return Number(v);
+      return v; // SSN, codes, dates and ZIPs stay text so leading zeros survive
+    }));
+  }
+  fields.forEach((f, i) => {
+    const col = ws.getColumn(i + 1);
+    col.width = Math.min(Math.max(f.label.length * 0.9, 12), 40);
+    if (NUM_FMT[f.type]) col.numFmt = f.decimals === 4 ? '0.0000' : NUM_FMT[f.type];
+    else col.numFmt = '@';
+  });
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+  return { ...meta, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(await wb.xlsx.writeBuffer()) };
+}
+
 router.get('/export', async (req, res, next) => {
   try {
-    const settings = getSettings();
-    const fields = TWN.exportFields(settings.include_tci);
-    const rows = selected(req).map(r => TWN.effective(r.data, settings));
-    const format = req.query.format === 'csv' ? 'csv' : 'xlsx';
-    const filename = TWN.fileName(settings, format);
-    res.set('Content-Disposition', `attachment; filename="${filename}"`);
-
-    if (format === 'csv') {
-      const q = v => /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-      const lines = [fields.map(f => q(f.label)).join(',')];
-      for (const e of rows) lines.push(fields.map(f => q(csvValue(f, e[f.key]))).join(','));
-      res.type('text/csv').send(lines.join('\r\n') + '\r\n');
-      return;
-    }
-
-    const wb = new ExcelJS.Workbook();
-    wb.creator = 'O Double G';
-    const ws = wb.addWorksheet('Sheet1'); // spec: one sheet, consistent name, usually "Sheet1"
-    ws.addRow(fields.map(f => f.label));
-    ws.getRow(1).font = { bold: true };
-    for (const e of rows) {
-      ws.addRow(fields.map(f => {
-        const v = e[f.key];
-        if (v === '') return null;
-        if (NUM_FMT[f.type] && !isNaN(Number(v))) return Number(v);
-        return v; // SSN, codes, dates and ZIPs stay text so leading zeros survive
-      }));
-    }
-    fields.forEach((f, i) => {
-      const col = ws.getColumn(i + 1);
-      col.width = Math.min(Math.max(f.label.length * 0.9, 12), 40);
-      if (NUM_FMT[f.type]) col.numFmt = f.decimals === 4 ? '0.0000' : NUM_FMT[f.type];
-      else col.numFmt = '@';
-    });
-    ws.views = [{ state: 'frozen', ySplit: 1 }];
-    res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    await wb.xlsx.write(res);
-    res.end();
+    const out = await buildExport(req.query);
+    res.set('Content-Disposition', `attachment; filename="${out.filename}"`);
+    res.type(out.type).send(out.buffer);
   } catch (e) { next(e); }
+});
+
+// ---- SFTP to Equifax MFT ----
+const sftp = require('./sftp');
+db.exec(`CREATE TABLE IF NOT EXISTS sftp_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sent_at TEXT DEFAULT (datetime('now')),
+  user_id INTEGER REFERENCES users(id),
+  host TEXT, remote_path TEXT, filename TEXT, bytes INTEGER,
+  rows INTEGER, people INTEGER, with_errors INTEGER, date_from TEXT, date_to TEXT,
+  ok INTEGER NOT NULL, error TEXT
+)`);
+
+router.get('/sftp/status', (req, res) => {
+  res.json({
+    ...sftp.info(),
+    file_type: getSettings().file_type,
+    log: db.prepare('SELECT s.*, u.name AS user_name FROM sftp_log s LEFT JOIN users u ON u.id = s.user_id ORDER BY s.id DESC LIMIT 20').all(),
+  });
+});
+
+router.post('/sftp/test', async (req, res) => {
+  try { res.json({ ok: true, ...(await sftp.test()) }); }
+  catch (e) { res.status(502).json({ error: e.userMessage || e.message }); }
+});
+
+// Builds the same file as Download, for the same date range, and uploads it.
+// Refuses to replace a file of the same name unless overwrite is set.
+router.post('/sftp/send', async (req, res, next) => {
+  const b = req.body || {};
+  let out;
+  try {
+    out = await buildExport({ format: b.format, from: b.from, to: b.to, ids: b.ids });
+    if (!out.rows) return res.status(400).json({ error: 'There are no paycheck records in that date range.' });
+  } catch (e) { return next(e); }
+  const log = (ok, error, remotePath) => db.prepare(`INSERT INTO sftp_log (user_id, host, remote_path, filename, bytes, rows, people, with_errors, date_from, date_to, ok, error)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(req.session.userId, sftp.info().host, remotePath || null, out.filename, out.buffer.length, out.rows, out.people, out.with_errors, b.from || null, b.to || null, ok ? 1 : 0, error || null);
+  try {
+    const r = await sftp.send(out.filename, out.buffer, { overwrite: !!b.overwrite });
+    log(true, null, r.remote_path);
+    res.json({ ok: true, filename: out.filename, remote_path: r.remote_path, bytes: out.buffer.length, rows: out.rows, people: out.people, with_errors: out.with_errors });
+  } catch (e) {
+    if (e.code === 'EXISTS') return res.status(409).json({ error: e.userMessage, exists: true, filename: out.filename });
+    log(false, e.userMessage || e.message);
+    res.status(502).json({ error: e.userMessage || e.message });
+  }
 });
 
 function csvValue(f, v) {
