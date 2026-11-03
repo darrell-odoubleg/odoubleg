@@ -79,7 +79,7 @@
       <input class="inp grow" id="listFilter" placeholder="Search name, job, SSN last 4…" oninput="renderList()">
       <select class="inp" id="listYear" style="width:auto" onchange="renderList()"></select>
       <select class="inp" id="listIssues" style="width:auto" onchange="renderList()">
-        <option value="">All records</option><option value="err">Has errors</option><option value="warn">Has warnings</option>
+        <option value="">All records</option><option value="err">Has errors</option><option value="warn">Has warnings</option><option value="out">Left out (contractors)</option><option value="in">In the Equifax file</option>
       </select>
       <button class="secondary" onclick="showTab('upload')">Upload files</button>
       <button class="primary" onclick="newRecord()">+ New Record</button>
@@ -107,6 +107,7 @@
             <button class="secondary" onclick="document.getElementById('formFile').click()">Fill from a file</button>
             <input type="file" id="formFile" multiple class="hidden" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.xlsx,.xlsm,.csv,.tsv,.txt,.docx" onchange="fillFromFiles(this.files)">
           </div>
+          <label class="muted" style="display:block;margin-top:0.5rem"><input type="checkbox" id="excludeBox" onchange="dirty = true"> Leave this record out of the Equifax file <span id="excludeWhy"></span></label>
           <div id="fillMsg" class="muted" style="margin-top:0.5rem"></div>
           <div class="muted" id="sourceNote" style="margin-top:0.3rem"></div>
         </div>
@@ -276,13 +277,16 @@ function filtered() {
     if (q && !`${r.first_name} ${r.last_name} ${r.job_title} ${r.ssn_masked}`.toLowerCase().includes(q)) return false;
     if (y === 'none' && r.check_date) return false;
     if (y && y !== 'none' && !r.check_date.endsWith(y)) return false;
-    if (iss === 'err' && !r.errors.length) return false;
-    if (iss === 'warn' && !r.warnings.length) return false;
+    if (iss === 'err' && (!r.errors.length || r.excluded)) return false;
+    if (iss === 'warn' && (!r.warnings.length || r.excluded)) return false;
+    if (iss === 'out' && !r.excluded) return false;
+    if (iss === 'in' && r.excluded) return false;
     return true;
   });
 }
 
 function issuePill(r) {
+  if (r.excluded) return `<span class="pill" style="background:#e5e7eb;color:var(--gray)" title="${esc(r.excluded)}">Left out${/^Lasso: /.test(r.excluded) ? ' · ' + esc(r.excluded.slice(7)) : ''}</span>`;
   if (r.errors.length) return `<span class="pill err" title="${esc(r.errors.join('\n'))}">${r.errors.length} error${r.errors.length > 1 ? 's' : ''}</span>`;
   if (r.warnings.length) return `<span class="pill warn" title="${esc(r.warnings.join('\n'))}">${r.warnings.length} warning${r.warnings.length > 1 ? 's' : ''}</span>`;
   return '<span class="pill good">OK</span>';
@@ -298,7 +302,7 @@ function renderList() {
       <td class="num">${money(r.gross_current)}</td><td>${esc(statusName(r.status) || (r.status ? r.status : ''))}</td><td>${issuePill(r)}</td></tr>`).join('')
     : `<tr><td colspan="8" class="muted">${records.length ? 'Nothing matches.' : 'No records yet. Upload files or add one with + New Record.'}</td></tr>`;
   const people = new Set(rows.map(r => `${r.first_name} ${r.last_name}|${r.ssn_masked}`)).size;
-  $('listCount').textContent = `${rows.length} record${rows.length === 1 ? '' : 's'} · ${people} ${people === 1 ? 'person' : 'people'} · ${rows.filter(r => r.errors.length).length} with errors`;
+  $('listCount').textContent = `${rows.length} record${rows.length === 1 ? '' : 's'} · ${people} ${people === 1 ? 'person' : 'people'} · ${rows.filter(r => r.errors.length && !r.excluded).length} with errors${rows.some(r => r.excluded) ? ` · ${rows.filter(r => r.excluded).length} left out` : ''}`;
   $('checkAll').checked = false;
 }
 const selectedIds = () => [...document.querySelectorAll('.rsel:checked')].map(c => Number(c.value));
@@ -373,6 +377,8 @@ function openEditor(rec) {
   $('delBtn').classList.toggle('hidden', !rec.id);
   $('fillMsg').textContent = ''; $('saveMsg').textContent = '';
   $('sourceNote').textContent = rec.data._source ? `Came from: ${rec.data._source}` : '';
+  $('excludeBox').checked = !!rec.data._excluded;
+  $('excludeWhy').textContent = rec.data._excluded ? `(${/^Lasso: /.test(rec.data._excluded) ? rec.data._excluded.slice(7) + ' in Lasso' : 'set by hand'})` : '';
   renderForm(rec.data);
   showTab('edit');
 }
@@ -388,8 +394,8 @@ async function saveRecord(next = false) {
   if (bad && !bad.value.trim()) delete data[bad.dataset.key];
   try {
     const out = current.id
-      ? await api('/api/twn/records/' + current.id, { method: 'PUT', body: { data } })
-      : await api('/api/twn/records', { method: 'POST', body: { data } });
+      ? await api('/api/twn/records/' + current.id, { method: 'PUT', body: { data, _excluded: $('excludeBox').checked } })
+      : await api('/api/twn/records', { method: 'POST', body: { data: { ...data, ...($('excludeBox').checked ? { _excluded: 'Manual' } : {}) } } });
     dirty = false;
     loadList();
     if (next) {
@@ -516,11 +522,13 @@ function exportPreview() {
     $('exFrom').value = `${y}-01-01`; $('exTo').value = `${y}-12-31`;
   }
   const from = $('exFrom').value, to = $('exTo').value;
-  const rows = records.filter(r => { const d = TWN.dateKey(r.check_date); return (!from || (d && d >= from)) && (!to || (d && d <= to)); });
+  const rows = records.filter(r => !r.excluded).filter(r => { const d = TWN.dateKey(r.check_date); return (!from || (d && d >= from)) && (!to || (d && d <= to)); });
+  const leftOut = records.filter(r => r.excluded && r.check_date).length;
   const errs = rows.filter(r => r.errors.length), noDate = records.filter(r => !r.check_date).length;
   $('exName').value = TWN.fileName(settings, 'xlsx');
   $('exSummary').innerHTML = `<b>${rows.length}</b> paycheck record${rows.length === 1 ? '' : 's'} for <b>${new Set(rows.map(r => r.ssn_masked + r.first_name + r.last_name)).size}</b> people in this range.`
     + (errs.length ? `<div style="color:var(--red);margin-top:0.3rem">${errs.length} of them have errors Equifax will likely reject: ${errs.slice(0, 6).map(r => `<a href="#" onclick="openRecord(${r.id});return false">${esc(r.first_name + ' ' + r.last_name)} ${esc(r.check_date)}</a>`).join(', ')}${errs.length > 6 ? '…' : ''}</div>` : (rows.length ? '<div class="ok" style="margin-top:0.3rem">No errors.</div>' : ''))
+    + (leftOut ? `<div class="muted" style="margin-top:0.3rem">${leftOut} paycheck record${leftOut === 1 ? ' is' : 's are'} left out (contractors/freelancers).</div>` : '')
     + (noDate ? `<div class="muted" style="margin-top:0.3rem">${noDate} record${noDate === 1 ? ' has' : 's have'} no check date and won't be included.</div>` : '')
     + `<div class="muted" style="margin-top:0.3rem">${settings.file_type === 'prod' ? 'Production' : 'Test'} file${settings.include_tci ? ', with TCI columns' : ''}. Change in Settings.</div>`;
 }
@@ -569,7 +577,10 @@ async function lassoSync(dryRun) {
       + (filled ? `<div class="muted" style="margin-top:0.3rem">Fields ${dryRun ? 'to fill' : 'filled'}: ${filled}</div>` : '<div class="muted" style="margin-top:0.3rem">No blank fields to fill.</div>')
       + conf
       + (r.status_changes && r.status_changes.length ? `<details open style="margin-top:0.35rem"><summary>Employee Status ${dryRun ? 'to update' : 'updated'} from Lasso (${r.status_changes.length})</summary><div class="table-wrap"><table class="codes"><tr><th>Employee</th><th>Lasso</th><th>Was</th><th>Now</th><th>Termination date set</th></tr>${r.status_changes.map(c => `<tr><td>${esc(c.who)}</td><td>${esc(c.lasso)}</td><td>${esc(c.from)}</td><td>${esc(c.to)}</td><td>${esc(c.term_date || '')}${c.active_with_term_date ? ' <span class="pill warn">active but has a termination date</span>' : ''}</td></tr>`).join('')}</table></div><div class="muted">Lasso has no termination dates, so a blank one is set to the end of the person's last pay period here. Change it on the record if you know the real last day.</div></details>` : '')
-      + list('Not employees in Lasso (contractor/volunteer/exempt) – check whether they belong in the Work Number file', r.not_employees, true)
+      + (r.type_changes && r.type_changes.length ? `<details style="margin-top:0.35rem"><summary>Employee Type ${dryRun ? 'to update' : 'updated'} from Lasso classification (${r.type_changes.length})</summary><div class="table-wrap"><table class="codes"><tr><th>Employee</th><th>Lasso</th><th>Was</th><th>Now</th></tr>${r.type_changes.map(c => `<tr><td>${esc(c.who)}</td><td>${esc(c.lasso)}</td><td>${esc(c.from)}</td><td>${esc(c.to)}</td></tr>`).join('')}</table></div></details>` : '')
+      + list(`Contractors/freelancers ${dryRun ? 'to leave' : 'left'} out of the Equifax file`, r.excluded || [], true)
+      + list(`Back in the Equifax file (Lasso now lists them as employees)`, r.included_again || [], true)
+      + list('Volunteer or exempt in Lasso – Employee Type left as is; check whether they belong in the Work Number file', r.not_employees, true)
       + list('Here but not found in Lasso', r.app_not_in_lasso)
       + list(`In Lasso but not here${$('lassoNew').checked ? (dryRun ? ' (would be added)' : ' (added)') : ''}`, r.lasso_not_in_app);
     if (!dryRun) { loadList(); api('/api/twn/lasso/status').then(s => lassoLast(s.last)); }
@@ -599,7 +610,7 @@ async function sftpTest() {
 }
 async function sftpSend(overwrite = false) {
   const from = TWN.fromIso($('exFrom').value), to = TWN.fromIso($('exTo').value), format = $('sftpFormat').value;
-  const inRange = records.filter(r => { const d = TWN.dateKey(r.check_date); return (!$('exFrom').value || (d && d >= $('exFrom').value)) && (!$('exTo').value || (d && d <= $('exTo').value)); });
+  const inRange = records.filter(r => !r.excluded).filter(r => { const d = TWN.dateKey(r.check_date); return (!$('exFrom').value || (d && d >= $('exFrom').value)) && (!$('exTo').value || (d && d <= $('exTo').value)); });
   if (!inRange.length) return alert('There are no paycheck records in that date range.');
   const errs = inRange.filter(r => r.errors.length).length;
   const name = TWN.fileName(settings, format);
