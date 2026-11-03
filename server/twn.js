@@ -404,24 +404,25 @@ router.post('/sftp/test', async (req, res) => {
 
 // Builds the same file as Download, for the same date range, and uploads it.
 // Refuses to replace a file of the same name unless overwrite is set.
-router.post('/sftp/send', async (req, res, next) => {
-  const b = req.body || {};
-  let out;
-  try {
-    out = await buildExport({ format: b.format, from: b.from, to: b.to, ids: b.ids });
-    if (!out.rows) return res.status(400).json({ error: 'There are no paycheck records in that date range.' });
-  } catch (e) { return next(e); }
+async function sendToEquifax(b = {}, userId = null) {
+  const out = await buildExport({ format: b.format, from: b.from, to: b.to, ids: b.ids });
+  if (!out.rows) throw Object.assign(new Error('no rows'), { status: 400, userMessage: 'There are no paycheck records in that date range.' });
   const log = (ok, error, remotePath) => db.prepare(`INSERT INTO sftp_log (user_id, host, remote_path, filename, bytes, rows, people, with_errors, date_from, date_to, ok, error)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(req.session.userId, sftp.info().host, remotePath || null, out.filename, out.buffer.length, out.rows, out.people, out.with_errors, b.from || null, b.to || null, ok ? 1 : 0, error || null);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(userId, sftp.info().host, remotePath || null, out.filename, out.buffer.length, out.rows, out.people, out.with_errors, b.from || null, b.to || null, ok ? 1 : 0, error || null);
   try {
     const r = await sftp.send(out.filename, out.buffer, { overwrite: !!b.overwrite });
     log(true, null, r.remote_path);
-    res.json({ ok: true, filename: out.filename, remote_path: r.remote_path, bytes: out.buffer.length, rows: out.rows, people: out.people, with_errors: out.with_errors });
+    return { ok: true, filename: out.filename, remote_path: r.remote_path, bytes: out.buffer.length, rows: out.rows, people: out.people, with_errors: out.with_errors };
   } catch (e) {
-    if (e.code === 'EXISTS') return res.status(409).json({ error: e.userMessage, exists: true, filename: out.filename });
+    if (e.code === 'EXISTS') throw Object.assign(e, { status: 409, exists: true, filename: out.filename });
     log(false, e.userMessage || e.message);
-    res.status(502).json({ error: e.userMessage || e.message });
+    throw Object.assign(e, { status: 502 });
   }
+}
+
+router.post('/sftp/send', async (req, res) => {
+  try { res.json(await sendToEquifax(req.body || {}, req.session.userId)); }
+  catch (e) { res.status(e.status || 500).json({ error: e.userMessage || 'Server error', ...(e.exists ? { exists: true, filename: e.filename } : {}) }); }
 });
 
 function csvValue(f, v) {
@@ -647,3 +648,4 @@ try { const n = backfillByUserId(null).size; if (n) console.log(`TWN: filled ${n
 
 module.exports = router;
 module.exports.runLassoSync = runLassoSync;
+module.exports.sendToEquifax = sendToEquifax;
