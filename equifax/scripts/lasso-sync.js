@@ -5,6 +5,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { runLassoSync } = require('../server/twn');
 
 const flag = f => process.argv.includes(f);
+console.log(`--- ${new Date().toISOString()}`);
 runLassoSync({ dry_run: flag('--dry-run'), overwrite: flag('--overwrite'), include_new: flag('--include-new') })
   .then(r => {
     console.log(`${r.dry_run ? 'DRY RUN: ' : ''}${r.lasso_crew} Lasso crew, ${r.people_matched} matched (ID ${r.matched_by['User ID']}, email ${r.matched_by.email}, name ${r.matched_by.name}); ${r.records_updated} records updated, ${r.created} added; ${r.linked_ids} people linked across two IDs.`);
