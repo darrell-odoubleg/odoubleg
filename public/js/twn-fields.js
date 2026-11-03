@@ -63,7 +63,7 @@
     F('original_hire_date', 'Original Hire Date', 'employment', 'date', { required: true }),
     F('adjusted_hire_date', 'Adjusted Hire Date', 'employment', 'date', { hint: 'Optional. For a break in service, to credit the earlier work period.' }),
     F('most_recent_hire_date', 'Most Recent Hire Date', 'employment', 'date', { hint: 'For a rehire. Blank = Equifax uses Original Hire Date.' }),
-    F('user_id', 'User ID', 'employment', 'text', { max: 64, hint: 'Unique ID per employee. No PII (not SSN/name/DOB). Records with the same User ID fill each other’s blank details.' }),
+    F('user_id', 'User ID', 'employment', 'text', { max: 64, hint: 'Unique ID per employee. No PII (not SSN/name/DOB). Records with the same User ID or SSN fill each other’s blank details.' }),
     F('pin', 'PIN', 'employment', 'digits', { max: 8, def: true, hint: 'Default PIN, 8 digits.' }),
     F('status', 'Employee Status', 'employment', 'code', { options: STATUS, def: true, required: true }),
     F('employee_type', 'Employee Type', 'employment', 'code', { options: EMP_TYPE, def: true, required: true }),

@@ -134,16 +134,27 @@ function update(id, data, adminId) {
   db.prepare("UPDATE twn_records SET data_enc = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?").run(encrypt(data), adminId, id);
 }
 
-// Records that share a User ID are the same employee: fill each one's blank
-// employee details from the others, most recent check date first. Existing
-// values are never changed. Returns Map(id -> new data) of records it filled.
+// Records that share a User ID or an SSN are the same employee (linked
+// transitively, so a record with only the User ID still joins the SSN ones):
+// fill each one's blank employee details from the others, most recent check
+// date first. Existing values are never changed. Name alone is not a match.
+// Returns Map(id -> { data, fields }) of the records it filled.
 const BACKFILL_KEYS = [...TWN.PERSON_KEYS.filter(k => k !== 'user_id'), 'fein'];
+const ssnKey = d => { const s = String(d.ssn || '').replace(/\D/g, ''); return s.length === 9 ? s : ''; };
 function backfillByUserId(adminId) {
-  const groups = new Map();
-  for (const r of loadAll()) {
-    const k = TWN.userIdKey(r.data);
-    if (k) (groups.get(k) || groups.set(k, []).get(k)).push(r);
+  const rows = loadAll();
+  const parent = rows.map((_, i) => i);
+  const find = i => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (const keyOf of [d => TWN.userIdKey(d), ssnKey]) {
+    const seen = new Map();
+    rows.forEach((r, i) => {
+      const k = keyOf(r.data);
+      if (!k) return;
+      if (seen.has(k)) parent[find(i)] = find(seen.get(k)); else seen.set(k, i);
+    });
   }
+  const groups = new Map();
+  rows.forEach((r, i) => { const g = find(i); (groups.get(g) || groups.set(g, []).get(g)).push(r); });
   const changed = new Map();
   for (const recs of groups.values()) {
     if (recs.length < 2) continue;
@@ -416,6 +427,6 @@ router.use((err, req, res, next) => {
   res.status(500).json({ error: err.userMessage || 'Server error' });
 });
 
-try { const n = backfillByUserId(null).size; if (n) console.log(`TWN: filled ${n} record(s) from matching User IDs`); } catch (e) { console.error('TWN backfill:', e.message); }
+try { const n = backfillByUserId(null).size; if (n) console.log(`TWN: filled ${n} record(s) from matching User IDs/SSNs`); } catch (e) { console.error('TWN backfill:', e.message); }
 
 module.exports = router;
