@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in | O Double G Equifax File</title><link rel="stylesheet" href="/css/style.css">
+<style>
+  .login { max-width: 380px; margin: 4rem auto; }
+  .login input { width: 100%; padding: 0.55rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.95rem; }
+  .login label { display: block; margin: 0.8rem 0 0.25rem; font-weight: 600; font-size: 0.9rem; }
+  .login button { width: 100%; margin-top: 1.1rem; }
+</style>
+</head>
+<body>
+<header><h1>O DOUBLE G &mdash; EQUIFAX FILE</h1></header>
+<main>
+  <form class="card login" id="f">
+    <h3>Sign in</h3>
+    <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+    <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+    <button class="primary" type="submit">Sign in</button>
+    <div class="error" id="err"></div>
+  </form>
+</main>
+<script>
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.value, password: password.value }) });
+  if (res.ok) location.href = '/';
+  else document.getElementById('err').textContent = (await res.json().catch(() => ({}))).error || 'Sign in failed';
+});
+</script>
+</body>
+</html>
