@@ -134,12 +134,42 @@ function update(id, data, adminId) {
   db.prepare("UPDATE twn_records SET data_enc = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?").run(encrypt(data), adminId, id);
 }
 
+// Records that share a User ID are the same employee: fill each one's blank
+// employee details from the others, most recent check date first. Existing
+// values are never changed. Returns Map(id -> new data) of records it filled.
+const BACKFILL_KEYS = [...TWN.PERSON_KEYS.filter(k => k !== 'user_id'), 'fein'];
+function backfillByUserId(adminId) {
+  const groups = new Map();
+  for (const r of loadAll()) {
+    const k = TWN.userIdKey(r.data);
+    if (k) (groups.get(k) || groups.set(k, []).get(k)).push(r);
+  }
+  const changed = new Map();
+  for (const recs of groups.values()) {
+    if (recs.length < 2) continue;
+    recs.sort((a, b) => TWN.dateKey(b.data.check_date).localeCompare(TWN.dateKey(a.data.check_date)) || b.id - a.id);
+    for (const r of recs) {
+      const data = { ...r.data };
+      let n = 0;
+      for (const k of BACKFILL_KEYS) {
+        if (data[k] != null && data[k] !== '') continue;
+        const src = recs.find(o => o !== r && o.data[k] != null && o.data[k] !== '');
+        if (src) { data[k] = src.data[k]; n++; }
+      }
+      if (n) changed.set(r.id, { data, fields: n });
+    }
+  }
+  if (changed.size) db.transaction(() => { for (const [id, c] of changed) update(id, c.data, adminId); })();
+  return changed;
+}
+
 router.post('/records', (req, res, next) => {
   try {
     const data = clean(req.body.data);
     if (req.body.data && req.body.data._source) data._source = String(req.body.data._source).slice(0, 200);
     const id = insert(data, req.session.userId);
-    res.json({ id, data });
+    const filled = backfillByUserId(req.session.userId);
+    res.json({ id, data: filled.has(id) ? filled.get(id).data : data, filled: filled.has(id) ? filled.get(id).fields : 0, others_filled: [...filled.keys()].filter(k => k !== id).length });
   } catch (e) { next(e); }
 });
 
@@ -151,7 +181,9 @@ router.put('/records/:id', (req, res, next) => {
     const data = clean(req.body.data);
     if (old._source) data._source = old._source;
     update(req.params.id, data, req.session.userId);
-    res.json({ id: Number(req.params.id), data });
+    const id = Number(req.params.id);
+    const filled = backfillByUserId(req.session.userId);
+    res.json({ id, data: filled.has(id) ? filled.get(id).data : data, filled: filled.has(id) ? filled.get(id).fields : 0, others_filled: [...filled.keys()].filter(k => k !== id).length });
   } catch (e) { next(e); }
 });
 
@@ -216,7 +248,7 @@ router.post('/merge', (req, res, next) => {
         const v = src[k];
         if (v == null || v === '') continue;
         if (target[k] == null || target[k] === '') { target[k] = v; changed = true; }
-        else if (String(target[k]) !== String(v)) {
+        else if (String(target[k]).trim().toLowerCase() !== String(v).trim().toLowerCase()) {
           const f = TWN.BY_KEY[k];
           report.conflicts.push({ who: idLabel, field: f.label, kept: overwrite ? v : target[k], other: overwrite ? target[k] : v, sensitive: !!f.sensitive });
           if (overwrite) { target[k] = v; changed = true; }
@@ -262,6 +294,7 @@ router.post('/merge', (req, res, next) => {
     })();
     report.updated = touched.size;
     report.created = created.length;
+    report.user_id_filled = backfillByUserId(req.session.userId).size;
     res.json(report);
   } catch (e) { next(e); }
 });
@@ -382,5 +415,7 @@ router.use((err, req, res, next) => {
   console.error('TWN:', err);
   res.status(500).json({ error: err.userMessage || 'Server error' });
 });
+
+try { const n = backfillByUserId(null).size; if (n) console.log(`TWN: filled ${n} record(s) from matching User IDs`); } catch (e) { console.error('TWN backfill:', e.message); }
 
 module.exports = router;

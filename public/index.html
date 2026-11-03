@@ -149,7 +149,7 @@
           <tbody id="extractList"></tbody>
         </table>
       </div>
-      <p class="muted">Records are matched to saved ones by SSN (or name) and check date. A form without a check date (W-4, new-hire) fills that person's details on all their records. Blank fields get filled; different existing values are listed below.</p>
+      <p class="muted">Records are matched to saved ones by SSN, User ID or name, plus check date. Records sharing a User ID fill each other's blank employee details. A form without a check date (W-4, new-hire) fills that person's details on all their records. Blank fields get filled; different existing values are listed below.</p>
       <div class="bar" style="margin:0">
         <label class="muted"><input type="checkbox" id="overwrite"> Replace existing values with what the files say</label>
         <span class="grow"></span>
@@ -371,13 +371,20 @@ async function saveRecord(next = false) {
       TWN.PERSON_KEYS.forEach(k => { if (out.data[k]) person[k] = out.data[k]; });
       ['fein', 'pay_rate', 'pay_rate_code', 'avg_hours'].concat(TWN.FIELDS.filter(f => f.group === 'tci').map(f => f.key)).forEach(k => { if (out.data[k]) person[k] = out.data[k]; });
       newRecord(person);
-      $('saveMsg').textContent = 'Saved. Now enter the next paycheck.';
+      $('saveMsg').textContent = 'Saved.' + userIdNote(out) + ' Now enter the next paycheck.';
     } else {
       current = { id: out.id, data: out.data };
       openEditor(current);
-      $('saveMsg').textContent = 'Saved.';
+      $('saveMsg').textContent = 'Saved.' + userIdNote(out);
     }
   } catch (e) { alert(e.message); }
+}
+
+function userIdNote(out) {
+  const parts = [];
+  if (out.filled) parts.push(`filled ${out.filled} blank field${out.filled === 1 ? '' : 's'} from other records with the same User ID`);
+  if (out.others_filled) parts.push(`filled in ${out.others_filled} other record${out.others_filled === 1 ? '' : 's'} with the same User ID`);
+  return parts.length ? ' ' + parts.join('; ').replace(/^./, c => c.toUpperCase()) + '.' : '';
 }
 
 async function deleteCurrent() {
@@ -465,7 +472,7 @@ async function mergeExtracted() {
     const r = await api('/api/twn/merge', { method: 'POST', body: { records: picked, overwrite: $('overwrite').checked } });
     const conf = r.conflicts.length ? `<details style="margin-top:0.4rem"><summary>${r.conflicts.length} field${r.conflicts.length === 1 ? '' : 's'} differed from what was saved (${$('overwrite').checked ? 'replaced' : 'kept the saved value'})</summary>
       <table class="codes"><tr><th>Record</th><th>Field</th><th>Kept</th><th>Other value</th></tr>${r.conflicts.map(c => `<tr><td>${esc(c.who)}</td><td>${esc(c.field)}</td><td>${c.sensitive ? '(hidden)' : esc(c.kept)}</td><td>${c.sensitive ? '(hidden)' : esc(c.other)}</td></tr>`).join('')}</table></details>` : '';
-    $('mergeMsg').innerHTML = `<span class="ok">Added ${r.created} new record${r.created === 1 ? '' : 's'}, updated ${r.updated}.</span> <button class="secondary" onclick="showTab('list')">View records</button>${conf}`;
+    $('mergeMsg').innerHTML = `<span class="ok">Added ${r.created} new record${r.created === 1 ? '' : 's'}, updated ${r.updated}.${r.user_id_filled ? ` Filled missing details on ${r.user_id_filled} record${r.user_id_filled === 1 ? '' : 's'} from matching User IDs.` : ''}</span> <button class="secondary" onclick="showTab('list')">View records</button>${conf}`;
     extracted = [];
     $('extractList').innerHTML = '';
     loadList();
