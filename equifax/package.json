@@ -1,0 +1,20 @@
+{
+  "name": "equifax-odoubleg",
+  "version": "1.0.0",
+  "description": "O Double G payroll file for Equifax The Work Number: form, uploads read by Claude, xlsx/csv export",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "private": true,
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0",
+    "better-sqlite3": "^11.10.0",
+    "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
+    "express": "^4.22.3",
+    "express-session": "^1.19.0",
+    "mammoth": "^1.13.0",
+    "multer": "^2.5.0"
+  }
+}
