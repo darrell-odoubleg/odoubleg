@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Number File | O Double G Events</title><link rel="stylesheet" href="/css/style.css">
+<style>
+  .hidden { display: none !important; }
+  main { max-width: 1200px; }
+  input, select, textarea { font-family: inherit; }
+  .inp, .fgrid input, .fgrid select { width: 100%; min-width: 0; padding: 0.45rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.9rem; background: white; }
+  .fgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.15rem 1rem; }
+  .fgrid label { display: block; margin: 0.55rem 0 0.2rem; font-weight: 600; font-size: 0.8rem; }
+  .fgrid label .req { color: var(--red); }
+  .fgrid .hint { color: var(--gray); font-size: 0.74rem; margin-top: 0.15rem; line-height: 1.25; }
+  .fgrid input.filled { background: #ecfdf3; border-color: var(--green); }
+  .fgrid input.bad, .fgrid select.bad { border-color: var(--red); }
+  button.secondary { background: white; color: var(--navy); border: 1px solid #cbd5e1; padding: 0.45rem 0.9rem; border-radius: 5px; cursor: pointer; font-size: 0.88rem; }
+  button.secondary:hover { border-color: var(--navy); }
+  button.danger { background: white; color: var(--red); border: 1px solid #f1c4bf; padding: 0.45rem 0.9rem; border-radius: 5px; cursor: pointer; font-size: 0.88rem; }
+  button:disabled { opacity: 0.55; cursor: default; }
+  .bar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-bottom: 1rem; }
+  .bar .grow { flex: 1; min-width: 180px; }
+  .muted { color: var(--gray); font-size: 0.85rem; }
+  .ok { color: var(--green); font-size: 0.9rem; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; padding: 0.1rem 0.55rem; border-radius: 12px; font-size: 0.76rem; font-weight: 600; white-space: nowrap; }
+  .pill.err { background: #fee2e2; color: var(--red); }
+  .pill.warn { background: #fef3c7; color: #92400e; }
+  .pill.good { background: #d1fae5; color: var(--green); }
+  tr.click { cursor: pointer; }
+  tr.click:hover td { background: #faf7f0; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 1.25rem; align-items: start; }
+  .side { position: sticky; top: 1rem; }
+  .side ul { margin: 0.3rem 0 0; padding-left: 1.1rem; font-size: 0.85rem; }
+  .side li { margin-bottom: 0.25rem; }
+  .side li.e { color: var(--red); }
+  .side li.w { color: #92400e; }
+  details.card > summary { cursor: pointer; font-weight: 700; font-size: 1.05rem; }
+  .drop { border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.6rem; text-align: center; background: white; cursor: pointer; }
+  .drop.over { border-color: var(--gold); background: #fffaf0; }
+  .filelist { margin: 0.6rem 0 0; padding: 0; list-style: none; font-size: 0.88rem; }
+  .filelist li { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid #f1f1f1; }
+  .result { font-size: 0.88rem; margin: 0.4rem 0; }
+  .result .notes { color: var(--gray); white-space: pre-wrap; margin: 0.2rem 0 0 1rem; }
+  .table-wrap { overflow-x: auto; }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid #cbd5e1; border-top-color: var(--navy); border-radius: 50%; animation: s 0.8s linear infinite; vertical-align: -2px; margin-right: 0.35rem; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .codes { font-size: 0.8rem; }
+  .codes td { padding: 0.2rem 0.4rem; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .side { position: static; }
+    .fgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    header { flex-wrap: wrap; gap: 0.5rem; padding: 1rem; }
+    header h1 { font-size: 1.1rem; }
+    main { padding: 0 1rem; }
+    .tabs { overflow-x: auto; }
+    .tabs button { white-space: nowrap; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>O DOUBLE G &mdash; WORK NUMBER FILE</h1>
+  <div><a href="/admin-dashboard.html">Admin</a> <a href="/quotes.html">Quotes</a> <button onclick="logout()">Log Out</button></div>
+</header>
+<main>
+  <div class="tabs">
+    <button class="active" data-tab="list" onclick="showTab('list')">Records</button>
+    <button data-tab="edit" onclick="showTab('edit')" id="editTabBtn">New Record</button>
+    <button data-tab="upload" onclick="showTab('upload')">Upload Files</button>
+    <button data-tab="export" onclick="showTab('export')">Export</button>
+    <button data-tab="settings" onclick="showTab('settings')">Settings</button>
+  </div>
+
+  <!-- ===== Records ===== -->
+  <div id="tab-list">
+    <p class="muted" style="margin-top:0">One record per paycheck, laid out for Equifax's The Work Number (DTS Prime ONE spec). Add them by hand, or upload paystubs, payroll registers or new-hire paperwork and let Claude fill them in.</p>
+    <div class="bar">
+      <input class="inp grow" id="listFilter" placeholder="Search name, job, SSN last 4…" oninput="renderList()">
+      <select class="inp" id="listYear" style="width:auto" onchange="renderList()"></select>
+      <select class="inp" id="listIssues" style="width:auto" onchange="renderList()">
+        <option value="">All records</option><option value="err">Has errors</option><option value="warn">Has warnings</option>
+      </select>
+      <button class="secondary" onclick="showTab('upload')">Upload files</button>
+      <button class="primary" onclick="newRecord()">+ New Record</button>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th style="width:28px"><input type="checkbox" id="checkAll" onchange="toggleAll(this.checked)"></th><th>Employee</th><th>SSN</th><th>Job</th><th>Check date</th><th class="num">Gross</th><th>Status</th><th>Checks</th></tr></thead>
+        <tbody id="recList"><tr><td colspan="8">Loading…</td></tr></tbody>
+      </table>
+      <div class="bar" style="margin:0.8rem 0 0">
+        <span class="muted grow" id="listCount"></span>
+        <button class="secondary" onclick="exportSelected('xlsx')">Export selected (.xlsx)</button>
+        <button class="danger" onclick="deleteSelected()">Delete selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Editor ===== -->
+  <div id="tab-edit" class="hidden">
+    <div class="layout">
+      <div>
+        <div class="card">
+          <div class="bar" style="margin:0">
+            <h3 id="editTitle" class="grow" style="margin:0">New Record</h3>
+            <select class="inp" id="crewPick" style="width:auto" onchange="fromCrew(this.value)"><option value="">Start from a crew member…</option></select>
+            <button class="secondary" onclick="document.getElementById('formFile').click()">Fill from a file</button>
+            <input type="file" id="formFile" multiple class="hidden" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.xlsx,.xlsm,.csv,.tsv,.txt,.docx" onchange="fillFromFiles(this.files)">
+          </div>
+          <div id="fillMsg" class="muted" style="margin-top:0.5rem"></div>
+          <div class="muted" id="sourceNote" style="margin-top:0.3rem"></div>
+        </div>
+        <div id="formGroups"></div>
+      </div>
+      <div class="side">
+        <div class="card">
+          <button class="primary" style="width:100%" onclick="saveRecord()">Save</button>
+          <button class="secondary" style="width:100%;margin-top:0.5rem" onclick="saveRecord(true)" title="Saves, then starts a new paycheck for the same person">Save &amp; add next check</button>
+          <button class="danger hidden" id="delBtn" style="width:100%;margin-top:0.5rem" onclick="deleteCurrent()">Delete record</button>
+          <div id="saveMsg" class="ok" style="margin-top:0.5rem"></div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:1rem">Checks</h3>
+          <div id="issues" class="muted">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Upload ===== -->
+  <div id="tab-upload" class="hidden">
+    <div class="card">
+      <h3>Upload files to fill in records</h3>
+      <p class="muted">Paystubs, payroll registers, YTD reports, new-hire forms, W-4s, termination notices. PDF, photos/scans, Excel (.xlsx), CSV, Word or text, up to 10 files at 25 MB each. Files are read in memory and not kept on the server.</p>
+      <div class="drop" id="drop" onclick="document.getElementById('upFiles').click()">Drop files here or click to choose</div>
+      <input type="file" id="upFiles" multiple class="hidden" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.xlsx,.xlsm,.xls,.csv,.tsv,.txt,.docx" onchange="addFiles(this.files); this.value=''">
+      <ul class="filelist" id="fileList"></ul>
+      <div class="bar" style="margin:0.8rem 0 0">
+        <span class="grow"></span>
+        <button class="primary" id="readBtn" onclick="readFiles()" disabled>Read files</button>
+      </div>
+    </div>
+    <div class="card hidden" id="extractCard">
+      <h3>What was found</h3>
+      <div id="extractFiles"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:28px"><input type="checkbox" checked onchange="document.querySelectorAll('.xrec').forEach(c => c.checked = this.checked)"></th><th>Employee</th><th>SSN</th><th>Check date</th><th class="num">Gross</th><th class="num">Fields</th><th>From</th></tr></thead>
+          <tbody id="extractList"></tbody>
+        </table>
+      </div>
+      <p class="muted">Records are matched to saved ones by SSN (or name) and check date. A form without a check date (W-4, new-hire) fills that person's details on all their records. Blank fields get filled; different existing values are listed below.</p>
+      <div class="bar" style="margin:0">
+        <label class="muted"><input type="checkbox" id="overwrite"> Replace existing values with what the files say</label>
+        <span class="grow"></span>
+        <button class="primary" onclick="mergeExtracted()">Add to records</button>
+      </div>
+      <div id="mergeMsg" style="margin-top:0.6rem"></div>
+    </div>
+  </div>
+
+  <!-- ===== Export ===== -->
+  <div id="tab-export" class="hidden">
+    <div class="card">
+      <h3>Export the Work Number file</h3>
+      <p class="muted">One row per paycheck, with the column headers from the spec's TWN (Single File) Sample tab, on a single sheet named Sheet1. Company defaults from Settings fill any blanks. The spec asks for check dates within one calendar year, starting 01/01, with every employee paid that year, including people who were terminated.</p>
+      <div class="fgrid" style="max-width:640px">
+        <div><label>Check dates from</label><input type="date" id="exFrom" onchange="exportPreview()"></div>
+        <div><label>to</label><input type="date" id="exTo" onchange="exportPreview()"></div>
+        <div class="span2" style="grid-column: span 2"><label>File name</label><input id="exName" readonly></div>
+      </div>
+      <div id="exSummary" style="margin:0.9rem 0"></div>
+      <div class="bar" style="margin:0">
+        <button class="primary" onclick="doExport('xlsx')">Download Excel (.xlsx)</button>
+        <button class="secondary" onclick="doExport('csv')">Download CSV</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Filled-in spec for Equifax</h3>
+      <p class="muted">The DTS Prime ONE Spec master template with column E ("Mapped Client Fields") filled in: which column of the export holds each field, or N/A where we don't send it. Also fills in client name, ER code and contact, and the mapping cells on the code tabs. Send it with your first test file.</p>
+      <button class="secondary" onclick="location.href='/api/twn/export-spec'">Download filled spec (.xlsx)</button>
+    </div>
+  </div>
+
+  <!-- ===== Settings ===== -->
+  <div id="tab-settings" class="hidden">
+    <div class="card">
+      <h3>Company</h3>
+      <div class="fgrid">
+        <div><label>Client name</label><input id="s_client_name"></div>
+        <div><label>Technical contact</label><input id="s_contact"></div>
+        <div><label>Employer Company Code (ER code) <span class="req" style="color:var(--red)">*</span></label><input id="s_employer_code" inputmode="numeric"></div>
+        <div><label>File type</label><select id="s_file_type"><option value="test">Test (_tstin)</option><option value="prod">Production (_prodin)</option></select></div>
+        <div><label>TCI Employer Company Code</label><input id="s_tci_company_code" inputmode="numeric"></div>
+        <div style="grid-column: span 3"><label>&nbsp;</label><label style="font-weight:400"><input type="checkbox" id="s_include_tci"> Include the TCI / work location columns in the export (only if Equifax set up tax-credit services)</label></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Company-wide defaults</h3>
+      <p class="muted">Used for any record that leaves the field blank.</p>
+      <div class="fgrid" id="defaultsGrid"></div>
+    </div>
+    <div class="bar"><button class="primary" onclick="saveSettings()">Save settings</button><span id="settingsMsg" class="ok"></span></div>
+    <details class="card">
+      <summary>Equifax code tables</summary>
+      <div class="fgrid" id="codeTables" style="align-items:start"></div>
+    </details>
+  </div>
+</main>
+
+<script src="/js/twn-fields.js"></script>
+<script>
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = v => v === '' || v == null || isNaN(Number(v)) ? '' : Number(v).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+const $ = id => document.getElementById(id);
+
+async function api(url, opts = {}) {
+  const isForm = opts.body instanceof FormData;
+  const res = await fetch(url, { headers: isForm ? {} : { 'Content-Type': 'application/json' }, ...opts, body: opts.body ? (isForm ? opts.body : JSON.stringify(opts.body)) : undefined });
+  if (res.status === 401) { location.href = '/admin-login.html'; throw new Error('Login required'); }
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || 'Request failed');
+  return j;
+}
+async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); location.href = '/admin-login.html'; }
+
+let settings = null, records = [], current = null, dirty = false, crew = [];
+
+function showTab(name) {
+  if (name === 'edit' && !current) { newRecord(); return; }
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  ['list', 'edit', 'upload', 'export', 'settings'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== name));
+  if (name === 'export') exportPreview();
+  window.scrollTo(0, 0);
+}
+
+// ---------- record list ----------
+async function loadList() {
+  records = (await api('/api/twn/records')).records;
+  const years = [...new Set(records.map(r => (r.check_date.match(/\d{4}$/) || [])[0]).filter(Boolean))].sort().reverse();
+  const sel = $('listYear'), keep = sel.value;
+  sel.innerHTML = '<option value="">All years</option>' + years.map(y => `<option>${y}</option>`).join('') + (records.some(r => !r.check_date) ? '<option value="none">No check date</option>' : '');
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
+  renderList();
+}
+
+function filtered() {
+  const q = $('listFilter').value.trim().toLowerCase(), y = $('listYear').value, iss = $('listIssues').value;
+  return records.filter(r => {
+    if (q && !`${r.first_name} ${r.last_name} ${r.job_title} ${r.ssn_masked}`.toLowerCase().includes(q)) return false;
+    if (y === 'none' && r.check_date) return false;
+    if (y && y !== 'none' && !r.check_date.endsWith(y)) return false;
+    if (iss === 'err' && !r.errors.length) return false;
+    if (iss === 'warn' && !r.warnings.length) return false;
+    return true;
+  });
+}
+
+function issuePill(r) {
+  if (r.errors.length) return `<span class="pill err" title="${esc(r.errors.join('\n'))}">${r.errors.length} error${r.errors.length > 1 ? 's' : ''}</span>`;
+  if (r.warnings.length) return `<span class="pill warn" title="${esc(r.warnings.join('\n'))}">${r.warnings.length} warning${r.warnings.length > 1 ? 's' : ''}</span>`;
+  return '<span class="pill good">OK</span>';
+}
+
+function renderList() {
+  const rows = filtered();
+  const statusName = c => (TWN.STATUS.find(s => s[0] === c) || [, c])[1] || '';
+  $('recList').innerHTML = rows.length ? rows.map(r => `<tr class="click" onclick="openRecord(${r.id})">
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="rsel" value="${r.id}"></td>
+      <td>${esc(`${r.last_name}${r.last_name && r.first_name ? ', ' : ''}${r.first_name}`) || '<span class="muted">(no name)</span>'}</td>
+      <td>${esc(r.ssn_masked)}</td><td>${esc(r.job_title)}</td><td>${esc(r.check_date) || '<span class="muted">—</span>'}</td>
+      <td class="num">${money(r.gross_current)}</td><td>${esc(statusName(r.status) || (r.status ? r.status : ''))}</td><td>${issuePill(r)}</td></tr>`).join('')
+    : `<tr><td colspan="8" class="muted">${records.length ? 'Nothing matches.' : 'No records yet. Upload files or add one with + New Record.'}</td></tr>`;
+  const people = new Set(rows.map(r => `${r.first_name} ${r.last_name}|${r.ssn_masked}`)).size;
+  $('listCount').textContent = `${rows.length} record${rows.length === 1 ? '' : 's'} · ${people} ${people === 1 ? 'person' : 'people'} · ${rows.filter(r => r.errors.length).length} with errors`;
+  $('checkAll').checked = false;
+}
+const selectedIds = () => [...document.querySelectorAll('.rsel:checked')].map(c => Number(c.value));
+function toggleAll(on) { document.querySelectorAll('.rsel').forEach(c => c.checked = on); }
+
+async function deleteSelected() {
+  const ids = selectedIds();
+  if (!ids.length) return alert('Check the records to delete first.');
+  if (!confirm(`Delete ${ids.length} record${ids.length > 1 ? 's' : ''}? This can't be undone.`)) return;
+  await api('/api/twn/records/delete', { method: 'POST', body: { ids } });
+  loadList();
+}
+function exportSelected(fmt) {
+  const ids = selectedIds();
+  if (!ids.length) return alert('Check the records to export first, or use the Export tab for a date range.');
+  location.href = `/api/twn/export?format=${fmt}&ids=${ids.join(',')}`;
+}
+
+// ---------- editor ----------
+function inputFor(f, value, opts = {}) {
+  const id = (opts.prefix || 'f_') + f.key;
+  const defVal = opts.defaults ? (settings.defaults || {})[f.key] : '';
+  if (f.type === 'code' || f.type === 'state') {
+    const list = f.type === 'state' ? TWN.STATES.map(s => [s, s]) : f.options;
+    const defLabel = defVal ? (list.find(o => o[0] === defVal) || [defVal, defVal]) : null;
+    const first = defLabel ? `<option value="">Default: ${esc(f.type === 'state' ? defLabel[0] : `${defLabel[0]} – ${defLabel[1]}`)}</option>` : '<option value=""></option>';
+    const known = list.some(o => o[0] === value);
+    return `<select id="${id}" data-key="${f.key}">${first}${!known && value ? `<option value="${esc(value)}" selected>${esc(value)} (not a valid code)</option>` : ''}${list.map(([c, d]) => `<option value="${esc(c)}"${c === value ? ' selected' : ''}>${esc(f.type === 'state' ? c : `${c} – ${d}`)}</option>`).join('')}</select>`;
+  }
+  if (f.type === 'date') {
+    const iso = TWN.toIso(value);
+    if (value && !iso) return `<input id="${id}" data-key="${f.key}" data-raw="1" value="${esc(value)}" class="bad" title="Not a date. Fix it as MM/DD/YYYY.">`;
+    return `<input type="date" id="${id}" data-key="${f.key}" value="${iso}">`;
+  }
+  const ph = defVal ? `Default: ${defVal}` : (f.key === 'ytd_gross' ? 'Auto: sum of YTD lines' : f.key === 'as_of_date' ? 'Auto: Date Paid' : '');
+  const mode = ['money', 'hours', 'int', 'digits', 'ssn', 'phone'].includes(f.type) ? ' inputmode="decimal"' : '';
+  return `<input id="${id}" data-key="${f.key}" value="${esc(value)}" placeholder="${esc(ph)}"${f.max ? ` maxlength="${f.max + 10}"` : ''}${mode} autocomplete="off"${f.sensitive ? ' autocomplete="off" spellcheck="false"' : ''}>`;
+}
+
+function renderForm(data) {
+  const groups = TWN.GROUPS.map(g => {
+    const fields = TWN.FIELDS.filter(f => f.group === g.key && !f.settingOnly);
+    const body = fields.map(f => `<div><label for="f_${f.key}">${esc(f.label)}${f.required ? ' <span class="req">*</span>' : ''}</label>${inputFor(f, data[f.key] || '', { defaults: f.def })}${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>`).join('');
+    const open = g.key !== 'tci' || settings.include_tci || fields.some(f => data[f.key]);
+    return `<details class="card" ${open ? 'open' : ''}><summary>${esc(g.label)}</summary><div class="fgrid">${body}</div></details>`;
+  }).join('');
+  $('formGroups').innerHTML = groups;
+  $('formGroups').querySelectorAll('input, select').forEach(el => el.addEventListener('input', () => { dirty = true; el.classList.remove('filled'); refreshIssues(); }));
+  refreshIssues();
+}
+
+function readForm() {
+  const data = {};
+  $('formGroups').querySelectorAll('[data-key]').forEach(el => {
+    const v = el.type === 'date' ? TWN.fromIso(el.value) : el.value.trim();
+    if (v !== '') data[el.dataset.key] = v;
+  });
+  return TWN.normalizeRecord(data);
+}
+
+function refreshIssues() {
+  const { errors, warnings } = TWN.validate(readForm(), settings);
+  $('issues').innerHTML = !errors.length && !warnings.length ? '<span class="pill good">Ready to export</span>'
+    : `<ul>${errors.map(e => `<li class="e">${esc(e)}</li>`).join('')}${warnings.map(w => `<li class="w">${esc(w)}</li>`).join('')}</ul>`;
+}
+
+function openEditor(rec) {
+  current = rec;
+  dirty = false;
+  $('editTitle').textContent = rec.id ? `${rec.data.first_name || ''} ${rec.data.last_name || ''}`.trim() + (rec.data.check_date ? ` · ${rec.data.check_date}` : '') || 'Record' : 'New Record';
+  $('editTabBtn').textContent = rec.id ? 'Edit Record' : 'New Record';
+  $('delBtn').classList.toggle('hidden', !rec.id);
+  $('crewPick').classList.toggle('hidden', !!rec.id);
+  $('crewPick').value = '';
+  $('fillMsg').textContent = ''; $('saveMsg').textContent = '';
+  $('sourceNote').textContent = rec.data._source ? `Came from: ${rec.data._source}` : '';
+  renderForm(rec.data);
+  showTab('edit');
+}
+function newRecord(data = {}) { openEditor({ id: null, data }); }
+async function openRecord(id) {
+  if (dirty && !confirm('Discard unsaved changes?')) return;
+  openEditor(await api('/api/twn/records/' + id));
+}
+
+async function saveRecord(next = false) {
+  const data = readForm();
+  const bad = $('formGroups').querySelector('[data-raw]');
+  if (bad && !bad.value.trim()) delete data[bad.dataset.key];
+  try {
+    const out = current.id
+      ? await api('/api/twn/records/' + current.id, { method: 'PUT', body: { data } })
+      : await api('/api/twn/records', { method: 'POST', body: { data } });
+    dirty = false;
+    loadList();
+    if (next) {
+      const person = {};
+      TWN.PERSON_KEYS.forEach(k => { if (out.data[k]) person[k] = out.data[k]; });
+      ['fein', 'pay_rate', 'pay_rate_code', 'avg_hours'].concat(TWN.FIELDS.filter(f => f.group === 'tci').map(f => f.key)).forEach(k => { if (out.data[k]) person[k] = out.data[k]; });
+      newRecord(person);
+      $('saveMsg').textContent = 'Saved. Now enter the next paycheck.';
+    } else {
+      current = { id: out.id, data: out.data };
+      openEditor(current);
+      $('saveMsg').textContent = 'Saved.';
+    }
+  } catch (e) { alert(e.message); }
+}
+
+async function deleteCurrent() {
+  if (!current.id || !confirm('Delete this record?')) return;
+  await api('/api/twn/records/delete', { method: 'POST', body: { ids: [current.id] } });
+  dirty = false; current = null;
+  await loadList();
+  showTab('list');
+}
+
+function fromCrew(id) {
+  const c = crew.find(x => String(x.id) === id);
+  if (!c) return;
+  const set = (k, v) => { const el = $('f_' + k); if (el && v && !el.value) { el.value = TWN.normalize(k, v); el.classList.add('filled'); } };
+  set('first_name', c.first_name); set('last_name', c.last_name); set('email', c.email); set('home_phone', c.phone); set('city', c.city); set('state', c.state);
+  dirty = true; refreshIssues();
+}
+
+// Fill the open form from uploaded files: only blank fields, highlighted green.
+async function fillFromFiles(files) {
+  if (!files.length) return;
+  const fd = new FormData();
+  [...files].forEach(f => fd.append('files', f));
+  $('fillMsg').innerHTML = '<span class="spin"></span>Reading…';
+  try {
+    const out = await api('/api/twn/extract', { method: 'POST', body: fd });
+    const recs = out.files.flatMap(f => f.records);
+    const errs = out.files.filter(f => f.error).map(f => f.error);
+    if (!recs.length) { $('fillMsg').textContent = errs.join(' ') || 'Nothing usable was found in that file.'; return; }
+    const form = readForm();
+    // prefer the record for this person, and for this check date if one is entered
+    const pick = recs.find(r => TWN.samePerson(r, form) && (!form.check_date || r.check_date === form.check_date)) || recs.find(r => TWN.samePerson(r, form)) || recs[0];
+    let n = 0, skipped = 0;
+    for (const [k, v] of Object.entries(pick)) {
+      const el = $('f_' + k);
+      if (!el || v === '' || k.startsWith('_')) continue;
+      const cur = el.type === 'date' ? TWN.fromIso(el.value) : el.value.trim();
+      if (cur) { if (cur !== v) skipped++; continue; }
+      if (el.type === 'date') el.value = TWN.toIso(v);
+      else if (el.tagName === 'SELECT') { if (![...el.options].some(o => o.value === v)) el.add(new Option(`${v} (not a valid code)`, v)); el.value = v; }
+      else el.value = v;
+      el.classList.add('filled'); n++;
+    }
+    dirty = dirty || n > 0;
+    refreshIssues();
+    const notes = out.files.map(f => f.notes).filter(Boolean).join(' ');
+    $('fillMsg').innerHTML = `Filled ${n} blank field${n === 1 ? '' : 's'} (green).${skipped ? ` ${skipped} field${skipped === 1 ? '' : 's'} already had a different value and were left alone.` : ''}${recs.length > 1 ? ` The file held ${recs.length} records; for all of them use the Upload Files tab.` : ''}${notes ? `<br>${esc(notes)}` : ''}${errs.length ? `<br><span style="color:var(--red)">${esc(errs.join(' '))}</span>` : ''}`;
+  } catch (e) { $('fillMsg').textContent = e.message; }
+  finally { $('formFile').value = ''; }
+}
+
+// ---------- upload tab ----------
+let pending = [], extracted = [];
+function addFiles(list) {
+  for (const f of list) if (!pending.some(p => p.name === f.name && p.size === f.size)) pending.push(f);
+  renderFiles();
+}
+function renderFiles() {
+  $('fileList').innerHTML = pending.map((f, i) => `<li><span>${esc(f.name)} <span class="muted">${(f.size / 1024).toFixed(0)} KB</span></span><button class="danger" style="padding:0.1rem 0.5rem" onclick="pending.splice(${i},1);renderFiles()">✕</button></li>`).join('');
+  $('readBtn').disabled = !pending.length;
+}
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+
+async function readFiles() {
+  if (pending.length > 10) return alert('Up to 10 files at a time.');
+  const fd = new FormData();
+  pending.forEach(f => fd.append('files', f));
+  $('readBtn').disabled = true;
+  $('readBtn').innerHTML = '<span class="spin"></span>Reading files…';
+  $('mergeMsg').innerHTML = '';
+  try {
+    const out = await api('/api/twn/extract', { method: 'POST', body: fd });
+    extracted = out.files.flatMap(f => f.records);
+    $('extractFiles').innerHTML = out.files.map(f => `<div class="result"><b>${esc(f.name)}</b>: ${f.error ? `<span style="color:var(--red)">${esc(f.error)}</span>` : `${f.records.length} record${f.records.length === 1 ? '' : 's'}${f.method === 'mapped' ? ' (spreadsheet columns mapped)' : ''}`}${f.notes ? `<div class="notes">${esc(f.notes)}</div>` : ''}</div>`).join('');
+    const mask = s => s && s.length >= 4 ? '***-**-' + s.slice(-4) : (s || '');
+    $('extractList').innerHTML = extracted.map((r, i) => `<tr><td><input type="checkbox" class="xrec" value="${i}" checked></td>
+      <td>${esc(`${r.last_name || ''}${r.last_name && r.first_name ? ', ' : ''}${r.first_name || ''}`) || '<span class="muted">(no name)</span>'}</td>
+      <td>${esc(mask(r.ssn))}</td><td>${esc(r.check_date || '—')}</td><td class="num">${money(r.gross_current)}</td>
+      <td class="num">${Object.keys(r).filter(k => !k.startsWith('_')).length}</td><td class="muted">${esc(r._source || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No records found.</td></tr>';
+    $('extractCard').classList.remove('hidden');
+    pending = []; renderFiles();
+  } catch (e) { alert(e.message); }
+  finally { $('readBtn').innerHTML = 'Read files'; $('readBtn').disabled = !pending.length; }
+}
+
+async function mergeExtracted() {
+  const picked = [...document.querySelectorAll('.xrec:checked')].map(c => extracted[Number(c.value)]);
+  if (!picked.length) return alert('Nothing checked.');
+  try {
+    const r = await api('/api/twn/merge', { method: 'POST', body: { records: picked, overwrite: $('overwrite').checked } });
+    const conf = r.conflicts.length ? `<details style="margin-top:0.4rem"><summary>${r.conflicts.length} field${r.conflicts.length === 1 ? '' : 's'} differed from what was saved (${$('overwrite').checked ? 'replaced' : 'kept the saved value'})</summary>
+      <table class="codes"><tr><th>Record</th><th>Field</th><th>Kept</th><th>Other value</th></tr>${r.conflicts.map(c => `<tr><td>${esc(c.who)}</td><td>${esc(c.field)}</td><td>${c.sensitive ? '(hidden)' : esc(c.kept)}</td><td>${c.sensitive ? '(hidden)' : esc(c.other)}</td></tr>`).join('')}</table></details>` : '';
+    $('mergeMsg').innerHTML = `<span class="ok">Added ${r.created} new record${r.created === 1 ? '' : 's'}, updated ${r.updated}.</span> <button class="secondary" onclick="showTab('list')">View records</button>${conf}`;
+    extracted = [];
+    $('extractList').innerHTML = '';
+    loadList();
+  } catch (e) { alert(e.message); }
+}
+
+// ---------- export ----------
+function exportQuery() {
+  const from = TWN.fromIso($('exFrom').value), to = TWN.fromIso($('exTo').value);
+  return `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+}
+function exportPreview() {
+  if (!$('exFrom').value && !$('exTo').value) {
+    const y = Math.max(...records.map(r => Number((r.check_date.match(/\d{4}$/) || [0])[0])), 0) || new Date().getFullYear();
+    $('exFrom').value = `${y}-01-01`; $('exTo').value = `${y}-12-31`;
+  }
+  const from = $('exFrom').value, to = $('exTo').value;
+  const rows = records.filter(r => { const d = TWN.dateKey(r.check_date); return (!from || (d && d >= from)) && (!to || (d && d <= to)); });
+  const errs = rows.filter(r => r.errors.length), noDate = records.filter(r => !r.check_date).length;
+  $('exName').value = TWN.fileName(settings, 'xlsx');
+  $('exSummary').innerHTML = `<b>${rows.length}</b> paycheck record${rows.length === 1 ? '' : 's'} for <b>${new Set(rows.map(r => r.ssn_masked + r.first_name + r.last_name)).size}</b> people in this range.`
+    + (errs.length ? `<div style="color:var(--red);margin-top:0.3rem">${errs.length} of them have errors Equifax will likely reject: ${errs.slice(0, 6).map(r => `<a href="#" onclick="openRecord(${r.id});return false">${esc(r.first_name + ' ' + r.last_name)} ${esc(r.check_date)}</a>`).join(', ')}${errs.length > 6 ? '…' : ''}</div>` : (rows.length ? '<div class="ok" style="margin-top:0.3rem">No errors.</div>' : ''))
+    + (noDate ? `<div class="muted" style="margin-top:0.3rem">${noDate} record${noDate === 1 ? ' has' : 's have'} no check date and won't be included.</div>` : '')
+    + `<div class="muted" style="margin-top:0.3rem">${settings.file_type === 'prod' ? 'Production' : 'Test'} file${settings.include_tci ? ', with TCI columns' : ''}. Change in Settings.</div>`;
+}
+function doExport(fmt) { location.href = `/api/twn/export?format=${fmt}&${exportQuery()}`; }
+
+// ---------- settings ----------
+function renderSettings() {
+  $('s_client_name').value = settings.client_name || '';
+  $('s_contact').value = settings.contact || '';
+  $('s_employer_code').value = settings.defaults.employer_code || '';
+  $('s_tci_company_code').value = settings.defaults.tci_company_code || '';
+  $('s_file_type').value = settings.file_type;
+  $('s_include_tci').checked = !!settings.include_tci;
+  $('defaultsGrid').innerHTML = TWN.FIELDS.filter(f => f.def).map(f => `<div><label>${esc(f.label)}</label>${inputFor(f, settings.defaults[f.key] || '', { prefix: 'd_' })}</div>`).join('');
+}
+async function saveSettings() {
+  const defaults = { employer_code: $('s_employer_code').value.trim(), tci_company_code: $('s_tci_company_code').value.trim() };
+  $('defaultsGrid').querySelectorAll('[data-key]').forEach(el => { defaults[el.dataset.key] = el.type === 'date' ? TWN.fromIso(el.value) : el.value.trim(); });
+  try {
+    settings = await api('/api/twn/settings', { method: 'PUT', body: { client_name: $('s_client_name').value, contact: $('s_contact').value, file_type: $('s_file_type').value, include_tci: $('s_include_tci').checked, defaults } });
+    renderSettings();
+    $('settingsMsg').textContent = 'Saved.';
+    setTimeout(() => $('settingsMsg').textContent = '', 2500);
+    loadList();
+  } catch (e) { alert(e.message); }
+}
+function renderCodeTables() {
+  const t = (title, list) => `<div><h4 style="margin:0.6rem 0 0.2rem">${title}</h4><table class="codes">${list.map(([c, d]) => `<tr><td><b>${esc(c)}</b></td><td>${esc(d)}</td></tr>`).join('')}</table></div>`;
+  $('codeTables').innerHTML = t('Employee Status', TWN.STATUS) + t('Employee Type', TWN.EMP_TYPE) + t('Pay Frequency', TWN.PAY_FREQ) + t('Pay Rate Description', TWN.PAY_RATE);
+}
+
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+(async function init() {
+  const me = await (await fetch('/api/auth/me')).json();
+  if (me.role !== 'admin') { location.href = '/admin-login.html'; return; }
+  settings = await api('/api/twn/settings');
+  renderSettings(); renderCodeTables();
+  api('/api/twn/crew').then(r => { crew = r.crew; $('crewPick').innerHTML = '<option value="">Start from a crew member…</option>' + crew.map(c => `<option value="${c.id}">${esc(c.last_name)}, ${esc(c.first_name)}</option>`).join(''); }).catch(() => {});
+  loadList();
+})();
+</script>
+</body>
+</html>
