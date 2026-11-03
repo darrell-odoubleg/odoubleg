@@ -141,8 +141,8 @@ function update(id, data, adminId) {
 // Returns Map(id -> { data, fields }) of the records it filled.
 const BACKFILL_KEYS = [...TWN.PERSON_KEYS.filter(k => k !== 'user_id'), 'fein'];
 const ssnKey = d => { const s = String(d.ssn || '').replace(/\D/g, ''); return s.length === 9 ? s : ''; };
-function backfillByUserId(adminId) {
-  const rows = loadAll();
+// Saved records grouped into people: same User ID or SSN, transitively.
+function personGroups(rows) {
   const parent = rows.map((_, i) => i);
   const find = i => (parent[i] === i ? i : (parent[i] = find(parent[i])));
   for (const keyOf of [d => TWN.userIdKey(d), ssnKey]) {
@@ -155,8 +155,12 @@ function backfillByUserId(adminId) {
   }
   const groups = new Map();
   rows.forEach((r, i) => { const g = find(i); (groups.get(g) || groups.set(g, []).get(g)).push(r); });
+  return [...groups.values()];
+}
+
+function backfillByUserId(adminId) {
   const changed = new Map();
-  for (const recs of groups.values()) {
+  for (const recs of personGroups(loadAll())) {
     if (recs.length < 2) continue;
     recs.sort((a, b) => TWN.dateKey(b.data.check_date).localeCompare(TWN.dateKey(a.data.check_date)) || b.id - a.id);
     for (const r of recs) {
@@ -422,6 +426,124 @@ router.get('/export-spec', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ---- Lasso (crew profiles) ----
+const lasso = require('./lasso');
+db.exec('CREATE TABLE IF NOT EXISTS lasso_sync (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL)');
+
+router.get('/lasso/status', (req, res) => {
+  const row = db.prepare('SELECT data FROM lasso_sync WHERE id = 1').get();
+  res.json({ configured: !!process.env.LASSO_API_KEY, last: row ? JSON.parse(row.data) : null });
+});
+
+// Downloads every Lasso crew profile and fills in the matching people's
+// records. Match order: Lasso external_code or code = User ID, then email,
+// then full name when only one Lasso crew member has that name. Blank fields
+// are filled; with overwrite, Lasso's value replaces a different saved one.
+// User ID is only ever filled, never replaced. dry_run reports without saving.
+async function runLassoSync(opts = {}, userId = null) {
+    const dryRun = !!opts.dry_run, overwrite = !!opts.overwrite, includeNew = !!opts.include_new;
+    const people = await lasso.fetchPeople();
+    const groups = personGroups(loadAll());
+    const gInfo = groups.map(recs => ({
+      recs,
+      ids: new Set(recs.map(r => TWN.userIdKey(r.data)).filter(Boolean)),
+      emails: new Set(recs.map(r => String(r.data.email || '').trim().toLowerCase()).filter(Boolean)),
+      names: new Set(recs.map(r => `${r.data.first_name || ''} ${r.data.last_name || ''}`.trim().toLowerCase().replace(/\s+/g, ' ')).filter(Boolean)),
+      who: `${recs[0].data.first_name || ''} ${recs[0].data.last_name || ''}`.trim() || 'Unnamed',
+      lasso: null, how: '',
+    }));
+    const nameCount = new Map();
+    for (const p of people) for (const n of p.names) nameCount.set(n, (nameCount.get(n) || 0) + 1);
+
+    const matchedPeople = new Set();
+    const pass = (how, test) => {
+      for (const p of people) {
+        if (matchedPeople.has(p)) continue;
+        const hits = gInfo.filter(g => !g.lasso && test(g, p));
+        for (const g of hits) { g.lasso = p; g.how = how; }
+        if (hits.length) matchedPeople.add(p);
+      }
+    };
+    const by = how => { const before = matchedPeople.size; return () => matchedPeople.size - before; };
+    let c;
+    c = by(); pass('User ID', (g, p) => p.ids.some(id => g.ids.has(id))); const nId = c();
+    c = by(); pass('email', (g, p) => p.email && g.emails.has(p.email)); const nEmail = c();
+    c = by(); pass('name', (g, p) => p.names.some(n => nameCount.get(n) === 1 && g.names.has(n))); const nName = c();
+
+    const report = {
+      dry_run: dryRun, lasso_crew: people.length, people_matched: 0, records_updated: 0, created: 0,
+      filled: {}, conflicts: [], matched_by: { 'User ID': nId, email: nEmail, name: nName },
+      lasso_not_in_app: [], app_not_in_lasso: [], inactive_in_lasso: [], not_employees: [],
+    };
+    const updates = new Map(), creates = [];
+    for (const g of gInfo) {
+      if (!g.lasso) { report.app_not_in_lasso.push(g.who); continue; }
+      const p = g.lasso;
+      if (p.status === 'inactive') report.inactive_in_lasso.push(g.who);
+      if (!['parttime', 'fulltime'].includes(p.classification)) report.not_employees.push(`${g.who} (${p.classification || 'no classification'})`);
+      for (const r of g.recs) {
+        const data = { ...r.data };
+        let changed = false;
+        const want = { ...p.fields };
+        if (p.user_id && !data.user_id) want.user_id = p.user_id;
+        for (const [k, v] of Object.entries(want)) {
+          const cur = data[k];
+          if (cur == null || cur === '') { data[k] = v; changed = true; report.filled[TWN.BY_KEY[k].label] = (report.filled[TWN.BY_KEY[k].label] || 0) + 1; }
+          else if (k !== 'user_id' && String(cur).trim().toLowerCase() !== String(v).trim().toLowerCase()) {
+            const f = TWN.BY_KEY[k];
+            if (report.conflicts.length < 300) report.conflicts.push({ who: `${g.who}${data.check_date ? ' · ' + data.check_date : ''}`, field: f.label, app: f.sensitive ? '(hidden)' : cur, lasso: f.sensitive ? '(hidden)' : v, replaced: overwrite });
+            if (overwrite) { data[k] = v; changed = true; }
+          }
+        }
+        if (changed) updates.set(r.id, data);
+      }
+    }
+    // One Lasso crew member matching several sets of records (e.g. some under
+    // the 202621 number, some under the DBLGP-U code) confirms they are one
+    // person: share their other details (SSN, birth date...) across them.
+    report.linked_ids = 0;
+    for (const p of matchedPeople) {
+      const gs = gInfo.filter(g => g.lasso === p);
+      if (gs.length < 2) continue;
+      report.linked_ids++;
+      const recs = gs.flatMap(g => g.recs.map(r => ({ id: r.id, data: updates.get(r.id) || r.data })))
+        .sort((a, b) => TWN.dateKey(b.data.check_date).localeCompare(TWN.dateKey(a.data.check_date)) || b.id - a.id);
+      for (const r of recs) {
+        const data = { ...r.data };
+        let n = 0;
+        for (const k of BACKFILL_KEYS) {
+          if (data[k] != null && data[k] !== '') continue;
+          const src = recs.find(o => o !== r && o.data[k] != null && o.data[k] !== '');
+          if (src) { data[k] = src.data[k]; n++; report.filled[TWN.BY_KEY[k].label] = (report.filled[TWN.BY_KEY[k].label] || 0) + 1; }
+        }
+        if (n) updates.set(r.id, data);
+      }
+    }
+    report.people_matched = matchedPeople.size;
+    for (const p of people) {
+      if (matchedPeople.has(p)) continue;
+      report.lasso_not_in_app.push(`${p.display}${p.status === 'inactive' ? ' (inactive)' : ''}`);
+      if (includeNew) creates.push({ ...p.fields, ...(p.user_id ? { user_id: p.user_id } : {}), _source: 'Lasso crew profile' });
+    }
+    report.records_updated = updates.size;
+    report.created = creates.length;
+    if (!dryRun) {
+      db.transaction(() => {
+        for (const [id, data] of updates) update(id, data, userId);
+        for (const data of creates) insert(clean(data), userId);
+      })();
+      report.user_id_filled = backfillByUserId(userId).size;
+      const last = { at: new Date().toISOString(), by: userId, crew: people.length, matched: report.people_matched, updated: report.records_updated, created: report.created };
+      db.prepare('INSERT INTO lasso_sync (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data').run(JSON.stringify(last));
+    }
+    for (const k of ['lasso_not_in_app', 'app_not_in_lasso', 'inactive_in_lasso', 'not_employees']) report[k] = [...new Set(report[k])].sort();
+    return report;
+}
+
+router.post('/lasso/sync', async (req, res, next) => {
+  try { res.json(await runLassoSync(req.body || {}, req.session.userId)); } catch (e) { next(e); }
+});
+
 router.use((err, req, res, next) => {
   console.error('TWN:', err);
   res.status(500).json({ error: err.userMessage || 'Server error' });
@@ -430,3 +552,4 @@ router.use((err, req, res, next) => {
 try { const n = backfillByUserId(null).size; if (n) console.log(`TWN: filled ${n} record(s) from matching User IDs/SSNs`); } catch (e) { console.error('TWN backfill:', e.message); }
 
 module.exports = router;
+module.exports.runLassoSync = runLassoSync;

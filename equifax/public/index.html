@@ -130,6 +130,19 @@
   <!-- ===== Upload ===== -->
   <div id="tab-upload" class="hidden">
     <div class="card">
+      <h3>Download employee info from Lasso</h3>
+      <p class="muted">Pulls every crew profile from odoubleg.lasso.io (legal name, email, phone, home address, birth date and hire date when entered, full/part time, active status) and fills in the matching people here. People are matched by Lasso's employee number or code = User ID, then email, then a name only one Lasso crew member has. Lasso has no SSNs or pay amounts. Nothing is ever changed in Lasso.</p>
+      <div class="bar" style="margin:0">
+        <label class="muted"><input type="checkbox" id="lassoOverwrite"> Replace different values with Lasso's</label>
+        <label class="muted"><input type="checkbox" id="lassoNew"> Also add Lasso crew who aren't here yet</label>
+        <span class="grow"></span>
+        <button class="secondary" onclick="lassoSync(true)">Preview</button>
+        <button class="primary" onclick="lassoSync(false)">Download from Lasso</button>
+      </div>
+      <div class="muted" id="lassoLast" style="margin-top:0.5rem"></div>
+      <div id="lassoMsg" style="margin-top:0.6rem"></div>
+    </div>
+    <div class="card">
       <h3>Upload files to fill in records</h3>
       <p class="muted">Paystubs, payroll registers, YTD reports, new-hire forms, W-4s, termination notices. PDF, photos/scans, Excel (.xlsx), CSV, Word or text, up to 10 files at 25 MB each. Files are read in memory and not kept on the server.</p>
       <div class="drop" id="drop" onclick="document.getElementById('upFiles').click()">Drop files here or click to choose</div>
@@ -526,6 +539,30 @@ function renderCodeTables() {
   $('codeTables').innerHTML = t('Employee Status', TWN.STATUS) + t('Employee Type', TWN.EMP_TYPE) + t('Pay Frequency', TWN.PAY_FREQ) + t('Pay Rate Description', TWN.PAY_RATE);
 }
 
+// ---------- Lasso ----------
+function lassoLast(last) {
+  $('lassoLast').textContent = last ? `Last download: ${new Date(last.at).toLocaleString()} · ${last.crew} crew, ${last.matched} matched, ${last.updated} records updated${last.created ? `, ${last.created} added` : ''}.` : 'Not downloaded yet.';
+}
+async function lassoSync(dryRun) {
+  const box = $('lassoMsg');
+  box.innerHTML = `<span class="spin"></span>${dryRun ? 'Checking' : 'Downloading'} Lasso crew…`;
+  try {
+    const r = await api('/api/twn/lasso/sync', { method: 'POST', body: { dry_run: dryRun, overwrite: $('lassoOverwrite').checked, include_new: $('lassoNew').checked } });
+    const list = (title, arr, open) => arr.length ? `<details${open ? ' open' : ''} style="margin-top:0.35rem"><summary>${title} (${arr.length})</summary><div class="muted" style="margin:0.3rem 0 0 1rem">${arr.map(esc).join(', ')}</div></details>` : '';
+    const filled = Object.entries(r.filled).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)}: ${n}`).join(' · ');
+    const conf = r.conflicts.length ? `<details style="margin-top:0.35rem"><summary>Different in Lasso (${r.conflicts.length}${r.conflicts.length >= 300 ? '+' : ''}) – ${$('lassoOverwrite').checked ? 'Lasso value used' : 'app value kept'}</summary>
+      <div class="table-wrap"><table class="codes"><tr><th>Record</th><th>Field</th><th>In app</th><th>In Lasso</th></tr>${r.conflicts.map(c => `<tr><td>${esc(c.who)}</td><td>${esc(c.field)}</td><td>${esc(c.app)}</td><td>${esc(c.lasso)}</td></tr>`).join('')}</table></div></details>` : '';
+    box.innerHTML = `<div class="${dryRun ? '' : 'ok'}"><b>${dryRun ? 'Preview – nothing saved yet.' : 'Done.'}</b> ${r.lasso_crew} crew in Lasso; ${r.people_matched} of them matched people here (${r.matched_by['User ID']} by User ID, ${r.matched_by.email} by email, ${r.matched_by.name} by name). ${dryRun ? 'Would update' : 'Updated'} ${r.records_updated} record${r.records_updated === 1 ? '' : 's'}${r.created ? `, ${dryRun ? 'would add' : 'added'} ${r.created}` : ''}.${r.linked_ids ? ` ${r.linked_ids} people had records under two different IDs; their details were shared across both.` : ''}${r.user_id_filled ? ` Then filled ${r.user_id_filled} more from matching User IDs/SSNs.` : ''}</div>`
+      + (filled ? `<div class="muted" style="margin-top:0.3rem">Fields ${dryRun ? 'to fill' : 'filled'}: ${filled}</div>` : '<div class="muted" style="margin-top:0.3rem">No blank fields to fill.</div>')
+      + conf
+      + list('Inactive in Lasso – check their Employee Status and termination date', r.inactive_in_lasso, true)
+      + list('Not employees in Lasso (contractor/volunteer/exempt) – check whether they belong in the Work Number file', r.not_employees, true)
+      + list('Here but not found in Lasso', r.app_not_in_lasso)
+      + list(`In Lasso but not here${$('lassoNew').checked ? (dryRun ? ' (would be added)' : ' (added)') : ''}`, r.lasso_not_in_app);
+    if (!dryRun) { loadList(); api('/api/twn/lasso/status').then(s => lassoLast(s.last)); }
+  } catch (e) { box.innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`; }
+}
+
 window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
 (async function init() {
@@ -534,6 +571,7 @@ window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); 
   $('who').textContent = (await res.json()).name;
   settings = await api('/api/twn/settings');
   renderSettings(); renderCodeTables();
+  api('/api/twn/lasso/status').then(s => lassoLast(s.last)).catch(() => {});
   loadList();
 })();
 </script>
