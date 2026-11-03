@@ -519,6 +519,45 @@ async function runLassoSync(opts = {}, userId = null) {
         if (n) updates.set(r.id, data);
       }
     }
+    // Employee Status follows Lasso on every run (not just when blank):
+    //  - Lasso active: A, unless the record already has another working code
+    //    (P part time, Y temporary, N new...). An inactive code becomes A.
+    //  - Lasso inactive: I (Inactive), unless the record already has an
+    //    inactive-type code (G, R, L...). Equifax requires a termination/
+    //    inactivity date for these; Lasso has none, so a blank one becomes the
+    //    end of the person's last pay period here (else their last check date).
+    //  - pending/preregister: left alone.
+    report.status_changes = [];
+    for (const p of matchedPeople) {
+      if (p.status !== 'active' && p.status !== 'inactive') continue;
+      const recs = gInfo.filter(g => g.lasso === p).flatMap(g => g.recs).map(r => ({ id: r.id, data: updates.get(r.id) || r.data }));
+      const who = recs.length ? `${recs[0].data.first_name || ''} ${recs[0].data.last_name || ''}`.trim() : p.display;
+      let lastDay = '';
+      for (const r of recs) {
+        const d = r.data.pp_end || r.data.check_date;
+        if (d && TWN.dateKey(d) > TWN.dateKey(lastDay)) lastDay = d;
+      }
+      const before = new Set(), after = new Set();
+      let termSet = '';
+      for (const r of recs) {
+        const data = { ...r.data };
+        const cur = data.status || '';
+        const isInactive = TWN.INACTIVE_STATUS.includes(cur);
+        before.add(cur || '(blank)');
+        if (p.status === 'active' && (!cur || isInactive)) data.status = 'A';
+        if (p.status === 'inactive') {
+          if (!isInactive) data.status = 'I';
+          if (!data.term_date && lastDay) { data.term_date = lastDay; termSet = lastDay; }
+        }
+        after.add(data.status || '(blank)');
+        if (data.status !== r.data.status || data.term_date !== r.data.term_date) updates.set(r.id, data);
+      }
+      const b = [...before].join('/'), a2 = [...after].join('/');
+      if (b !== a2 || termSet) report.status_changes.push({ who, lasso: p.status, from: b, to: a2, term_date: termSet, active_with_term_date: p.status === 'active' && recs.some(r => (updates.get(r.id) || r.data).term_date) });
+    }
+    report.status_changes.sort((x, y) => x.who.localeCompare(y.who));
+    report.records_updated = updates.size;
+
     report.people_matched = matchedPeople.size;
     for (const p of people) {
       if (matchedPeople.has(p)) continue;
