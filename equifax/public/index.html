@@ -189,6 +189,19 @@
       </div>
     </div>
     <div class="card">
+      <h3>Send to Equifax (SFTP)</h3>
+      <p class="muted">Builds the same file as the download above (same check-date range) and uploads it straight to Equifax's secure file transfer. It is not PGP-encrypted, as agreed with Equifax.</p>
+      <div id="sftpInfo" class="muted">Loading…</div>
+      <div class="bar" style="margin:0.8rem 0 0">
+        <label class="muted">Format <select class="inp" id="sftpFormat" style="width:auto"><option value="csv">CSV (.csv)</option><option value="xlsx">Excel (.xlsx)</option></select></label>
+        <span class="grow"></span>
+        <button class="secondary" onclick="sftpTest()">Test connection</button>
+        <button class="primary" id="sftpSendBtn" onclick="sftpSend()">Send file to Equifax</button>
+      </div>
+      <div id="sftpMsg" style="margin-top:0.6rem"></div>
+      <details style="margin-top:0.6rem"><summary class="muted">Sent files</summary><div class="table-wrap" id="sftpLog"></div></details>
+    </div>
+    <div class="card">
       <h3>Filled-in spec for Equifax</h3>
       <p class="muted">The DTS Prime ONE Spec master template with column E ("Mapped Client Fields") filled in: which column of the export holds each field, or N/A where we don't send it. Also fills in client name, ER code and contact, and the mapping cells on the code tabs. Send it with your first test file.</p>
       <button class="secondary" onclick="location.href='/api/twn/export-spec'">Download filled spec (.xlsx)</button>
@@ -243,7 +256,7 @@ function showTab(name) {
   if (name === 'edit' && !current) { newRecord(); return; }
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   ['list', 'edit', 'upload', 'export', 'settings'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== name));
-  if (name === 'export') exportPreview();
+  if (name === 'export') { exportPreview(); sftpLoad(); }
   window.scrollTo(0, 0);
 }
 
@@ -561,6 +574,45 @@ async function lassoSync(dryRun) {
       + list(`In Lasso but not here${$('lassoNew').checked ? (dryRun ? ' (would be added)' : ' (added)') : ''}`, r.lasso_not_in_app);
     if (!dryRun) { loadList(); api('/api/twn/lasso/status').then(s => lassoLast(s.last)); }
   } catch (e) { box.innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`; }
+}
+
+// ---------- SFTP ----------
+let sftpStatus = null;
+async function sftpLoad() {
+  try {
+    sftpStatus = await api('/api/twn/sftp/status');
+    const st = sftpStatus;
+    const mismatch = (/UAT/.test(st.environment) && st.file_type === 'prod') || (!/UAT/.test(st.environment) && st.file_type !== 'prod');
+    $('sftpInfo').innerHTML = !st.configured ? '<span style="color:var(--red)">Equifax SFTP is not set up on the server.</span>'
+      : `<b>${esc(st.environment)}</b> · ${esc(st.host)}:${st.port} · user ${esc(st.username)} · folder <code>${esc(st.dir)}</code>${st.hostkey_pinned ? ' · server key pinned' : ''}`
+        + (mismatch ? `<div style="color:#92400e;margin-top:0.3rem">Settings say this is a ${st.file_type === 'prod' ? 'Production (_prodin)' : 'Test (_tstin)'} file but the server is ${esc(st.environment)}. Check File type in Settings.</div>` : '');
+    $('sftpSendBtn').disabled = !st.configured;
+    $('sftpLog').innerHTML = st.log.length ? `<table class="codes"><tr><th>When</th><th>By</th><th>File</th><th class="num">Rows</th><th>Range</th><th>Result</th></tr>${st.log.map(l => `<tr><td>${esc(new Date(l.sent_at.replace(' ', 'T') + 'Z').toLocaleString())}</td><td>${esc(l.user_name || '')}</td><td>${esc(l.filename)}</td><td class="num">${l.rows}</td><td>${esc([l.date_from, l.date_to].filter(Boolean).join(' – '))}</td><td>${l.ok ? '<span class="pill good">Sent</span>' : `<span class="pill err" title="${esc(l.error || '')}">Failed</span> ${esc(l.error || '')}`}</td></tr>`).join('')}</table>` : '<span class="muted">Nothing sent yet.</span>';
+  } catch (e) { $('sftpInfo').textContent = e.message; }
+}
+async function sftpTest() {
+  $('sftpMsg').innerHTML = '<span class="spin"></span>Connecting to Equifax…';
+  try {
+    const r = await api('/api/twn/sftp/test', { method: 'POST', body: {} });
+    $('sftpMsg').innerHTML = `<span class="ok">Connected and logged in. The folder ${esc(r.dir)} has ${r.files} file${r.files === 1 ? '' : 's'}.</span>`;
+  } catch (e) { $('sftpMsg').innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`; }
+}
+async function sftpSend(overwrite = false) {
+  const from = TWN.fromIso($('exFrom').value), to = TWN.fromIso($('exTo').value), format = $('sftpFormat').value;
+  const inRange = records.filter(r => { const d = TWN.dateKey(r.check_date); return (!$('exFrom').value || (d && d >= $('exFrom').value)) && (!$('exTo').value || (d && d <= $('exTo').value)); });
+  if (!inRange.length) return alert('There are no paycheck records in that date range.');
+  const errs = inRange.filter(r => r.errors.length).length;
+  const name = TWN.fileName(settings, format);
+  if (!overwrite && !confirm(`Send ${name} to Equifax ${sftpStatus ? sftpStatus.environment : ''}?\n\n${inRange.length} paycheck records, check dates ${from || 'any'} to ${to || 'any'}.${errs ? `\n\n${errs} of them have errors Equifax will likely reject.` : ''}`)) return;
+  $('sftpMsg').innerHTML = '<span class="spin"></span>Sending…';
+  try {
+    const r = await api('/api/twn/sftp/send', { method: 'POST', body: { format, from, to, overwrite } });
+    $('sftpMsg').innerHTML = `<span class="ok">Sent ${esc(r.filename)} (${r.rows} records, ${(r.bytes / 1024).toFixed(0)} KB) to ${esc(r.remote_path)}.</span>`;
+  } catch (e) {
+    if (/already in the Equifax folder/.test(e.message) && confirm(`${e.message}\n\nReplace it with this new file?`)) return sftpSend(true);
+    $('sftpMsg').innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`;
+  }
+  sftpLoad();
 }
 
 window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
