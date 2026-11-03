@@ -5,7 +5,8 @@
 //
 // Lasso has no SSNs or pay data. What it has: legal name, email, phone, home
 // address, birth date (crew settings, when entered), onboarded date,
-// classification (full/part time) and status.
+// classification (full/part time) and status (active/inactive/pending/
+// preregister; no termination date).
 
 const TWN = require('../public/js/twn-fields');
 
@@ -64,7 +65,7 @@ function toPerson(c, positionNames) {
   set('dob', c.settings && c.settings.date_of_birth);
   set('original_hire_date', c.date_onboarded);
   if (CLASSIFICATION[c.classification]) f.employee_type = CLASSIFICATION[c.classification];
-  if (c.status === 'active') f.status = 'A';
+  // status is not a fill-in field: server/twn.js keeps it in step with Lasso
   const approved = (c.positions || []).filter(p => p.status === 'approved' && positionNames[p.position]);
   if (approved.length === 1) set('job_title', positionNames[approved[0].position]);
   const ids = [c.external_code, c.code].map(v => String(v || '').trim().toLowerCase()).filter(Boolean);
