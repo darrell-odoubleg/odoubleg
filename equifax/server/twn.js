@@ -105,7 +105,7 @@ function summary(r, settings) {
     id: r.id, updated_at: r.updated_at,
     first_name: d.first_name || '', last_name: d.last_name || '', ssn_masked: mask(d.ssn), job_title: d.job_title || '',
     check_date: d.check_date || '', gross_current: d.gross_current || '', status: d.status || '', source: d._source || '',
-    errors, warnings,
+    excluded: d._excluded || '', errors, warnings,
   };
 }
 
@@ -182,6 +182,7 @@ router.post('/records', (req, res, next) => {
   try {
     const data = clean(req.body.data);
     if (req.body.data && req.body.data._source) data._source = String(req.body.data._source).slice(0, 200);
+    if (req.body.data && req.body.data._excluded) data._excluded = 'Manual';
     const id = insert(data, req.session.userId);
     const filled = backfillByUserId(req.session.userId);
     res.json({ id, data: filled.has(id) ? filled.get(id).data : data, filled: filled.has(id) ? filled.get(id).fields : 0, others_filled: [...filled.keys()].filter(k => k !== id).length });
@@ -195,6 +196,8 @@ router.put('/records/:id', (req, res, next) => {
     const old = decrypt(row.data_enc);
     const data = clean(req.body.data);
     if (old._source) data._source = old._source;
+    if ('_excluded' in (req.body || {})) { if (req.body._excluded) data._excluded = old._excluded && !String(old._excluded).startsWith('Manual') ? old._excluded : 'Manual'; }
+    else if (old._excluded) data._excluded = old._excluded;
     update(req.params.id, data, req.session.userId);
     const id = Number(req.params.id);
     const filled = backfillByUserId(req.session.userId);
@@ -288,6 +291,7 @@ router.post('/merge', (req, res, next) => {
           const latest = mine.sort((a, b) => TWN.dateKey(b.data.check_date).localeCompare(TWN.dateKey(a.data.check_date)))[0];
           const rec = { ...data, _source: source };
           if (latest) for (const k of TWN.PERSON_KEYS) if ((rec[k] == null || rec[k] === '') && latest.data[k]) rec[k] = latest.data[k];
+          if (latest && latest.data._excluded) rec._excluded = latest.data._excluded;
           created.push(rec);
         }
       } else if (mine.length) {
@@ -320,6 +324,7 @@ function selected(req) {
   const ids = String(req.query.ids || '').split(',').map(Number).filter(Boolean);
   const from = TWN.toIso(TWN.normDate(req.query.from || '')), to = TWN.toIso(TWN.normDate(req.query.to || ''));
   return loadAll()
+    .filter(r => !r.data._excluded)
     .filter(r => !ids.length || ids.includes(r.id))
     .filter(r => { const d = TWN.dateKey(r.data.check_date); return (!from || (d && d >= from)) && (!to || (d && d <= to)); })
     .sort((a, b) => sortKey(a.data).localeCompare(sortKey(b.data)));
@@ -484,6 +489,8 @@ router.get('/export-spec', async (req, res, next) => {
 
 // ---- Lasso (crew profiles) ----
 const lasso = require('./lasso');
+const LASSO_TYPE = { fulltime: 'F', parttime: 'P' };
+const EXCLUDED_CLASSES = ['contractor', 'vendor']; // freelancers: not on the Work Number file
 db.exec('CREATE TABLE IF NOT EXISTS lasso_sync (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL)');
 
 router.get('/lasso/status', (req, res) => {
@@ -536,7 +543,7 @@ async function runLassoSync(opts = {}, userId = null) {
       if (!g.lasso) { report.app_not_in_lasso.push(g.who); continue; }
       const p = g.lasso;
       if (p.status === 'inactive') report.inactive_in_lasso.push(g.who);
-      if (!['parttime', 'fulltime'].includes(p.classification)) report.not_employees.push(`${g.who} (${p.classification || 'no classification'})`);
+      if (!['parttime', 'fulltime', ...EXCLUDED_CLASSES].includes(p.classification)) report.not_employees.push(`${g.who} (${p.classification || 'no classification'})`);
       for (const r of g.recs) {
         const data = { ...r.data };
         let changed = false;
@@ -583,7 +590,37 @@ async function runLassoSync(opts = {}, userId = null) {
     //    inactivity date for these; Lasso has none, so a blank one becomes the
     //    end of the person's last pay period here (else their last check date).
     //  - pending/preregister: left alone.
+    // Employee Type follows Lasso's classification on every run: fulltime -> F,
+    // parttime -> P. Contractors and vendors (freelancers) are not employees,
+    // so their records are flagged _excluded and left out of the Equifax file;
+    // the flag comes off if Lasso reclassifies them. Exempt and volunteer keep
+    // whatever type the record has. A manual exclusion is never touched.
     report.status_changes = [];
+    report.type_changes = [];
+    report.excluded = [];
+    report.included_again = [];
+    for (const p of matchedPeople) {
+      const recs0 = gInfo.filter(g => g.lasso === p).flatMap(g => g.recs).map(r => ({ id: r.id, data: updates.get(r.id) || r.data }));
+      if (!recs0.length) continue;
+      const who0 = `${recs0[0].data.first_name || ''} ${recs0[0].data.last_name || ''}`.trim() || p.display;
+      const type = LASSO_TYPE[p.classification];
+      const exclude = EXCLUDED_CLASSES.includes(p.classification);
+      const tBefore = new Set(recs0.map(r => r.data.employee_type || '(blank)'));
+      let wasExcluded = false, wasIncluded = false;
+      for (const r of recs0) {
+        const data = { ...r.data };
+        if (type) data.employee_type = type;
+        const lassoFlag = String(data._excluded || '').startsWith('Lasso');
+        if (exclude && !data._excluded) { data._excluded = `Lasso: ${p.classification}`; wasExcluded = true; }
+        if (!exclude && lassoFlag) { delete data._excluded; wasIncluded = true; }
+        if (data.employee_type !== r.data.employee_type || data._excluded !== r.data._excluded) updates.set(r.id, data);
+      }
+      if (type && [...tBefore].join('/') !== type) report.type_changes.push({ who: who0, lasso: p.classification, from: [...tBefore].join('/'), to: type });
+      if (wasExcluded) report.excluded.push(`${who0} (${p.classification})`);
+      if (wasIncluded) report.included_again.push(`${who0} (${p.classification})`);
+    }
+    report.type_changes.sort((x, y) => x.who.localeCompare(y.who));
+
     for (const p of matchedPeople) {
       if (p.status !== 'active' && p.status !== 'inactive') continue;
       const recs = gInfo.filter(g => g.lasso === p).flatMap(g => g.recs).map(r => ({ id: r.id, data: updates.get(r.id) || r.data }));
@@ -631,7 +668,7 @@ async function runLassoSync(opts = {}, userId = null) {
       const last = { at: new Date().toISOString(), by: userId, crew: people.length, matched: report.people_matched, updated: report.records_updated, created: report.created };
       db.prepare('INSERT INTO lasso_sync (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data').run(JSON.stringify(last));
     }
-    for (const k of ['lasso_not_in_app', 'app_not_in_lasso', 'inactive_in_lasso', 'not_employees']) report[k] = [...new Set(report[k])].sort();
+    for (const k of ['lasso_not_in_app', 'app_not_in_lasso', 'inactive_in_lasso', 'not_employees', 'excluded', 'included_again']) report[k] = [...new Set(report[k])].sort();
     return report;
 }
 

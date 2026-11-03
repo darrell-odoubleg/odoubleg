@@ -39,7 +39,6 @@ async function getAll(path) {
   return out;
 }
 
-const CLASSIFICATION = { fulltime: 'F', parttime: 'P' }; // contractor/volunteer/vendor/exempt: no Work Number type
 
 function pickAddress(addresses) {
   const list = (addresses || []).filter(a => a.status !== 'deleted' && (a.street1 || a.locality));
@@ -64,7 +63,7 @@ function toPerson(c, positionNames) {
   } else if (c.us_state_of_residence) set('state', c.us_state_of_residence);
   set('dob', c.settings && c.settings.date_of_birth);
   set('original_hire_date', c.date_onboarded);
-  if (CLASSIFICATION[c.classification]) f.employee_type = CLASSIFICATION[c.classification];
+  // employee type (from classification) is not a fill-in field either: twn.js keeps it in step
   // status is not a fill-in field: server/twn.js keeps it in step with Lasso
   const approved = (c.positions || []).filter(p => p.status === 'approved' && positionNames[p.position]);
   if (approved.length === 1) set('job_title', positionNames[approved[0].position]);
