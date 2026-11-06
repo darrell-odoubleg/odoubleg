@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Requests | O Double G Rentals</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="masthead"><div class="wrap masthead-in admin-top">
+  <a class="brand" href="/admin">O Double G <span>Requests</span></a>
+  <button id="logout" class="link-btn" type="button">Sign out</button>
+</div></header>
+<main class="wrap">
+  <div class="admin-head">
+    <h1>Requests</h1>
+    <div><label class="sr" for="filter">Show status</label><select id="filter"></select></div>
+  </div>
+  <p id="state" class="state" role="status">Loading…</p>
+  <div class="inbox">
+    <ul id="list" class="req-list"></ul>
+    <div id="detail" class="detail" hidden></div>
+  </div>
+</main>
+<script src="/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backline Rentals | O Double G</title>
+<meta name="description" content="Request backline for your show: drums, amps, keyboards, DJ gear, risers and more. O Double G confirms availability and price.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="wrap masthead-in">
+    <a class="brand" href="#">O Double G <span>Backline Rentals</span></a>
+  </div>
+</header>
+
+<main>
+  <!-- Step 1: pick gear -->
+  <section id="view-catalog" class="wrap" hidden>
+    <div class="intro">
+      <h1>What does your show need?</h1>
+      <p>Add the gear to your request and send it over. We'll get back to you with availability and price. Nothing is booked until we confirm.</p>
+    </div>
+    <div class="layout">
+      <div class="catalog">
+        <div class="filters">
+          <label class="sr" for="search">Search gear</label>
+          <input id="search" type="search" placeholder="Search gear, like &quot;kick pedal&quot; or &quot;Fender&quot;" autocomplete="off">
+          <div id="chips" class="chips" role="group" aria-label="Filter by category"></div>
+        </div>
+        <p id="load-state" class="state" role="status">Loading gear…</p>
+        <div id="groups"></div>
+        <div id="no-match" class="state" hidden>
+          <p>Nothing matches that search.</p>
+          <p>You can describe it under "Anything else" when you review your request.</p>
+          <button id="no-match-go" class="btn btn-quiet" type="button">Review request</button>
+        </div>
+      </div>
+      <aside class="sheet" aria-label="Your request">
+        <h2>Your request</h2>
+        <p id="sheet-empty" class="muted">Nothing added yet.</p>
+        <ul id="sheet-list" class="sheet-list"></ul>
+        <a id="sheet-go" class="btn btn-go" href="#request" hidden>Review &amp; send</a>
+      </aside>
+    </div>
+    <a id="mobile-bar" class="mobile-bar" href="#request" hidden>
+      <span id="mobile-count"></span><span>Review &amp; send →</span>
+    </a>
+  </section>
+
+  <!-- Step 2: review and send -->
+  <section id="view-request" class="wrap narrow" hidden>
+    <a class="back" href="#">← Back to gear</a>
+    <h1>Review and send</h1>
+
+    <form id="form" novalidate>
+      <fieldset>
+        <legend>Gear</legend>
+        <p id="items-empty" class="muted" hidden>No gear added yet. <a href="#">Browse the gear list</a> or describe what you need below.</p>
+        <ul id="items" class="items"></ul>
+        <p id="err-items" class="err" hidden></p>
+        <label for="other_gear">Anything else?</label>
+        <p class="hint">Gear that isn't on the list, or a full rider requirement.</p>
+        <textarea id="other_gear" name="other_gear" rows="3" maxlength="3000"></textarea>
+      </fieldset>
+
+      <fieldset>
+        <legend>The show</legend>
+        <div class="field"><label for="event_name">Event name <b>*</b></label><input id="event_name" name="event_name" maxlength="200" required></div>
+        <div class="field"><label for="artist">Artist</label><input id="artist" name="artist" maxlength="160"></div>
+        <div class="row">
+          <div class="field"><label for="venue">Venue</label><input id="venue" name="venue" maxlength="200"></div>
+          <div class="field"><label for="city_state">City and state <b>*</b></label><input id="city_state" name="city_state" maxlength="120" required></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="start_date">First day needed <b>*</b></label><input id="start_date" name="start_date" type="date" required></div>
+          <div class="field"><label for="end_date">Last day needed <b>*</b></label><input id="end_date" name="end_date" type="date" required></div>
+        </div>
+        <div class="field" id="delivery-field" role="radiogroup" aria-labelledby="delivery-label">
+          <span id="delivery-label" class="label">Getting the gear <b>*</b></span>
+          <div class="radios">
+            <label><input type="radio" name="delivery" value="Deliver to venue"> Deliver to venue</label>
+            <label><input type="radio" name="delivery" value="Pick up"> Pick up</label>
+            <label><input type="radio" name="delivery" value="Not sure yet"> Not sure yet</label>
+          </div>
+        </div>
+        <div class="field"><label for="notes">Notes</label>
+          <p class="hint">Load-in time, stage access, who to call on site.</p>
+          <textarea id="notes" name="notes" rows="3" maxlength="3000"></textarea></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>You</legend>
+        <div class="row">
+          <div class="field"><label for="name">Your name <b>*</b></label><input id="name" name="name" autocomplete="name" maxlength="120" required></div>
+          <div class="field"><label for="company">Company</label><input id="company" name="company" autocomplete="organization" maxlength="160"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="email">Email <b>*</b></label><input id="email" name="email" type="email" autocomplete="email" maxlength="200" required></div>
+          <div class="field"><label for="phone">Phone <b>*</b></label><input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="40" required></div>
+        </div>
+      </fieldset>
+
+      <div class="trap" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
+
+      <p id="form-error" class="form-error" role="alert" hidden></p>
+      <button id="send" class="btn btn-go btn-wide" type="submit">Send request</button>
+      <p class="muted center">This is a request, not a booking. We'll confirm availability and price.</p>
+    </form>
+  </section>
+
+  <!-- Step 3: sent -->
+  <section id="view-done" class="wrap narrow done" hidden>
+    <h1 tabindex="-1">Request sent</h1>
+    <p>We have your request and will be in touch about availability and price.</p>
+    <p class="ref-line">Your reference: <strong id="done-ref"></strong></p>
+    <a class="btn btn-quiet" href="#">Start another request</a>
+  </section>
+</main>
+
+<footer class="foot"><div class="wrap">O Double G LLC</div></footer>
+<script src="/app.js"></script>
+</body>
+</html>
