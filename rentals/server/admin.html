@@ -35,13 +35,15 @@
     <div class="admin-head"><h1>Products</h1><span id="prod-count" class="muted"></span></div>
     <div class="prod-layout">
       <form id="add-form" class="detail" novalidate>
-        <h2>Add a product</h2>
+        <h2 id="form-title">Add a product</h2>
         <div class="field"><label for="add-name">Product name</label><input id="add-name" maxlength="100" autocomplete="off"></div>
         <div class="field"><label for="add-category">Category</label><select id="add-category"></select></div>
         <div class="field" id="add-new-wrap" hidden><label for="add-new">New category name</label><input id="add-new" maxlength="60" autocomplete="off"></div>
         <div class="field"><label for="add-makes">Makes (optional)</label><p class="hint">Separate with commas, like DW, Yamaha.</p><input id="add-makes" autocomplete="off"></div>
+        <label class="check" for="add-popular"><input id="add-popular" type="checkbox"> Show under "Most requested"</label>
         <p id="add-err" class="err" role="alert" hidden></p>
-        <button class="btn btn-go" type="submit">Add product</button>
+        <button id="add-submit" class="btn btn-go" type="submit">Add product</button>
+        <button id="add-cancel" class="btn btn-quiet" type="button" hidden>Cancel</button>
         <p id="add-ok" class="muted" role="status"></p>
       </form>
       <div>

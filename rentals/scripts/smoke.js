@@ -104,6 +104,29 @@ const post = (url, body, headers) => fetch(base + url, { method: 'POST', headers
     const reread = execFileSync('node', ['-e', "console.log(require('./server/products').get('snare-drum'))"], { cwd: path.join(__dirname, '..'), env }).toString().trim();
     assert.equal(reread, 'null', 'deleted product stays deleted');
 
+    // Editing
+    const put = (id, body, headers = { cookie }) => fetch(`${base}/api/admin/products/${id}`, { method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const edit = { name: 'Drum kit, 5 piece', category: 'Drums', makes: 'DW, Gretsch', popular: true };
+    assert.equal((await put('drum-kit', edit, {})).status, 401, 'editing needs a login');
+    assert.equal((await put('no-such-item', edit)).status, 404);
+    assert.equal((await put('drum-kit', { ...edit, name: '' })).status, 400);
+    assert.equal((await put('drum-kit', { ...edit, name: 'kick DRUM' })).status, 409, 'cannot rename onto another product');
+    assert.equal((await put('drum-kit', { ...edit, name: 'Drum Kit' })).status, 200, 'can change only the capitals of its own name');
+    r = await put('drum-kit', edit);
+    assert.deepEqual(await r.json(), { id: 'drum-kit', name: 'Drum kit, 5 piece', category: 'Drums', makes: ['DW', 'Gretsch'] });
+    let now = await (await fetch(`${base}/api/catalog`)).json();
+    assert(now.popular.includes('drum-kit'));
+    const before = now.categories.join();
+    const place = now.items.findIndex((i) => i.id === 'kick-drum');
+    await put('kick-drum', { name: 'Kick drum', category: 'Drums', makes: 'DW' });
+    now = await (await fetch(`${base}/api/catalog`)).json();
+    assert.equal(now.items.findIndex((i) => i.id === 'kick-drum'), place, 'rename keeps its place');
+    assert.equal((await put('drum-kit', { ...edit, category: 'other', popular: false })).status, 200);
+    now = await (await fetch(`${base}/api/catalog`)).json();
+    assert.equal(now.categories.join(), before, 'moving the first item does not reorder categories');
+    assert.equal(now.items.find((i) => i.id === 'drum-kit').category, 'Other', 'joins existing category');
+    assert(!now.popular.includes('drum-kit'));
+
     // Rate limit: 3 saved already, limit is 6 per hour.
     for (let i = 0; i < 3; i++) assert.equal((await post('/api/requests', good)).status, 201);
     assert.equal((await post('/api/requests', good)).status, 429, 'rate limit applies');

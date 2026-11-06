@@ -157,9 +157,17 @@ textarea { resize: vertical; display: block; }
 .prod-group h2 { font-size: 24px; text-transform: uppercase; margin: 22px 0 4px; }
 .prod-group ul { list-style: none; margin: 0; padding: 0; }
 .prod-group li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 4px; border-top: 1px solid var(--rule); }
+.check { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; min-height: 40px; font-weight: 400; cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--go); }
+.prod-layout #add-cancel { margin-top: 8px; }
+.prod-group li.editing { background: var(--go-tint); }
+.prod-actions { flex: none; display: flex; gap: 6px; }
+.btn-edit { min-height: 36px; padding: 2px 12px; background: none; border: 1px solid var(--ink); border-radius: 3px; font-weight: 600; cursor: pointer; }
+.btn-edit:hover { background: var(--ink); color: #fff; }
 .btn-del { flex: none; min-height: 36px; padding: 2px 12px; background: none; border: 1px solid var(--bad); border-radius: 3px; color: var(--bad); font-weight: 600; cursor: pointer; }
 .btn-del:hover { background: var(--bad); color: #fff; }
-@media (max-width: 860px) { .prod-layout { grid-template-columns: 1fr; } }
+@media (min-width: 861px) { #add-form { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; } }
+@media (max-width: 860px) { .prod-layout { grid-template-columns: 1fr; } #add-form { scroll-margin-top: 12px; } }
 
 /* Request inbox */
 .signin { max-width: 380px; margin: 56px auto; padding: 0 16px; }
