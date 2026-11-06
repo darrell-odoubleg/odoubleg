@@ -67,8 +67,8 @@
         saved.textContent = '';
         try {
           await api(`/api/admin/requests/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: status.value, internal_notes: notes.value }) });
-          saved.textContent = 'Saved';
           await load();
+          saved.textContent = 'Saved';
         } catch (e) { saved.textContent = e.message; }
       },
     }, 'Save');
