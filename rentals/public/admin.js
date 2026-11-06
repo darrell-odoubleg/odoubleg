@@ -15,7 +15,7 @@
     const res = await fetch(url, opts);
     if (res.status === 401) { location.href = '/login.html'; throw new Error('Signed out'); }
     const out = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(out.error || 'Request failed');
+    if (!res.ok) throw Object.assign(new Error(out.error || 'Request failed'), { fields: out.fields });
     return out;
   }
 
@@ -54,7 +54,132 @@
 
   const row = (label, value) => (value ? [el('dt', {}, label), el('dd', {}, value)] : []);
 
+  const emailLink = (r) => el('a', { href: `mailto:${encodeURIComponent(r.email).replace(/%40/, '@')}?subject=${encodeURIComponent(`Backline request ${r.ref}`)}` }, r.email);
+
+  // Contact, show and gear for a request, or for the customer's saved original.
+  const readView = (r) => [
+    el('h3', {}, 'Contact'),
+    el('dl', {},
+      row('Name', r.name), row('Company', r.company), row('Email', emailLink(r)),
+      row('Phone', el('a', { href: `tel:${r.phone.replace(/[^\d+]/g, '')}` }, r.phone))),
+    el('h3', {}, 'Show'),
+    el('dl', {},
+      row('Event', r.event_name), row('Dates', span(r.start_date, r.end_date)), row('Artist', r.artist), row('Venue', r.venue),
+      row('City', r.city_state), row('Getting gear', r.delivery)),
+    r.notes ? [el('h3', {}, 'Notes'), el('p', { class: 'pre' }, r.notes)] : null,
+    el('h3', {}, 'Gear'),
+    r.items.length ? el('table', { class: 'pick' },
+      el('thead', {}, el('tr', {}, el('th', {}, 'Qty'), el('th', {}, 'Item'), el('th', {}, 'Make or size'))),
+      el('tbody', {}, r.items.map((i) => el('tr', {}, el('td', {}, String(i.qty)), el('td', {}, i.gear, i.category === 'Custom request' ? el('span', { class: 'tag' }, 'Custom') : null), el('td', {}, i.spec))))) : null,
+  ].flat().filter(Boolean);
+
+  const DELIVERY = ['Deliver to venue', 'Pick up', 'Not sure yet'];
+  let dirty = false; // an open edit form has unsaved changes
+
+  function renderRead(main, r, message) {
+    dirty = false;
+    const edit = el('button', { type: 'button', id: 'edit-details', class: 'btn-edit', onclick: () => renderEdit(main, r) }, 'Edit details');
+    main.replaceChildren(...[
+      el('div', { class: 'head-row' }, el('h2', {}, r.event_name), edit),
+      el('p', { class: 'muted' }, `${r.ref}, received ${when(r.created_at)}${r.edited_at ? `, edited ${when(r.edited_at)}` : ''}`),
+      message ? el('p', { class: 'muted', role: 'status', id: 'details-msg' }, message) : null,
+      ...readView(r),
+      r.original ? el('details', { class: 'original', id: 'original' },
+        el('summary', {}, 'See what the customer originally sent'), ...readView({ ...r.original, ref: r.ref })) : null,
+    ].filter(Boolean));
+    return edit;
+  }
+
+  async function renderEdit(main, r) {
+    const { items: products } = await api('/api/catalog');
+    const input = (name, label, props = {}) => el('div', { class: 'field' },
+      el('label', { htmlFor: `e-${name}` }, label),
+      el(props.tag || 'input', { id: `e-${name}`, value: r[name] || '', ...(props.attrs || {}) }));
+    const itemsBox = el('div', { id: 'e-items' });
+
+    const addLine = (line = { gear: '', qty: 1, spec: '' }, focus = false) => {
+      const gear = el('input', { class: 'e-gear', value: line.gear, maxLength: 200, 'aria-label': 'Item', placeholder: 'Item' });
+      gear.setAttribute('list', 'e-gear-options');
+      const qty = el('input', { class: 'e-qty', type: 'number', min: 1, max: 99, value: line.qty, 'aria-label': 'Quantity' });
+      const spec = el('input', { class: 'e-spec spec', value: line.spec, maxLength: 500, 'aria-label': 'Make or size', placeholder: 'Make or size' });
+      const rowEl = el('div', { class: 'edit-item' }, gear, qty,
+        el('button', { type: 'button', class: 'x', 'aria-label': 'Remove item', onclick: () => { rowEl.remove(); dirty = true; $('e-add').focus(); } }, '×'), spec);
+      itemsBox.append(rowEl);
+      if (focus) gear.focus();
+    };
+
+    const err = el('p', { class: 'form-error', role: 'alert', hidden: true });
+    const form = el('form', { id: 'edit-form', noValidate: true },
+      el('h2', {}, 'Edit request'),
+      el('p', { class: 'muted' }, r.original ? 'The customer\'s original stays saved.' : 'The customer\'s original will be saved so you can still see it.'),
+      el('h3', {}, 'Contact'),
+      el('div', { class: 'row' }, input('name', 'Name'), input('company', 'Company')),
+      el('div', { class: 'row' }, input('email', 'Email', { attrs: { type: 'email' } }), input('phone', 'Phone', { attrs: { type: 'tel' } })),
+      el('h3', {}, 'Show'),
+      input('event_name', 'Event name'),
+      input('artist', 'Artist'),
+      el('div', { class: 'row' }, input('venue', 'Venue'), input('city_state', 'City and state')),
+      el('div', { class: 'row' }, input('start_date', 'First day needed', { attrs: { type: 'date' } }), input('end_date', 'Last day needed', { attrs: { type: 'date' } })),
+      el('div', { class: 'field' }, el('label', { htmlFor: 'e-delivery' }, 'Getting the gear'),
+        el('select', { id: 'e-delivery' }, DELIVERY.map((d) => el('option', { value: d, selected: d === r.delivery }, d)))),
+      input('notes', 'Notes', { tag: 'textarea', attrs: { rows: 3, maxLength: 3000 } }),
+      el('h3', {}, 'Gear'),
+      el('datalist', { id: 'e-gear-options' }, products.map((p) => el('option', { value: p.name }))),
+      itemsBox,
+      el('p', { class: 'err', id: 'e-items-err', hidden: true, tabIndex: -1 }),
+      el('button', { type: 'button', id: 'e-add', class: 'btn btn-quiet add-line', onclick: () => { addLine(undefined, true); dirty = true; } }, 'Add an item'),
+      err,
+      el('div', { class: 'edit-actions' },
+        el('button', { type: 'submit', class: 'btn btn-go' }, 'Save changes'),
+        el('button', { type: 'button', id: 'e-cancel', class: 'btn btn-quiet', onclick: () => renderRead(main, r).focus() }, 'Cancel')));
+    r.items.forEach((i) => addLine(i));
+    form.addEventListener('input', () => { dirty = true; });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      form.querySelectorAll('.field .err').forEach((n) => n.remove());
+      form.querySelectorAll('[aria-invalid]').forEach((n) => n.removeAttribute('aria-invalid'));
+      err.hidden = true;
+      $('e-items-err').hidden = true;
+      const body = Object.fromEntries(['name', 'company', 'email', 'phone', 'event_name', 'artist', 'venue', 'city_state', 'start_date', 'end_date', 'delivery', 'notes'].map((f) => [f, $(`e-${f}`).value]));
+      body.items = [...itemsBox.querySelectorAll('.edit-item')].map((n) => ({
+        gear: n.querySelector('.e-gear').value, qty: Number(n.querySelector('.e-qty').value), spec: n.querySelector('.e-spec').value,
+      }));
+      try {
+        const out = await api(`/api/admin/requests/${r.id}/details`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const fresh = await api(`/api/admin/requests/${r.id}`);
+        await load();
+        renderRead(main, fresh, out.changed ? 'Saved your changes.' : 'Nothing was changed.').focus();
+        main.scrollIntoView({ block: 'nearest' });
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.hidden = false;
+        const targets = [];
+        Object.entries(ex.fields || {}).forEach(([name, message]) => {
+          if (name === 'items') {
+            $('e-items-err').textContent = message;
+            $('e-items-err').hidden = false;
+            targets.push($('e-items-err'));
+            return;
+          }
+          const field = $(`e-${name}`);
+          if (!field) return;
+          field.setAttribute('aria-invalid', 'true');
+          field.closest('.field').append(el('p', { class: 'err' }, message));
+          targets.push(field);
+        });
+        targets.sort((x, y) => (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+        if (targets[0]) targets[0].focus();
+      }
+    });
+
+    main.replaceChildren(form);
+    main.scrollIntoView({ block: 'nearest' });
+    $('e-name').focus({ preventScroll: true });
+  }
+
   async function open(id) {
+    if (dirty && !window.confirm('Discard your unsaved edits to this request?')) return;
     const r = await api(`/api/admin/requests/${id}`);
     current = id;
     renderList();
@@ -72,29 +197,17 @@
         } catch (e) { saved.textContent = e.message; }
       },
     }, 'Save');
+    [status, notes].forEach((n) => n.addEventListener('input', () => { saved.textContent = ''; }));
 
-    $('detail').replaceChildren(...[
-      el('h2', {}, r.event_name),
-      el('p', { class: 'muted' }, `${r.ref}, received ${when(r.created_at)}`),
-      el('h3', {}, 'Contact'),
-      el('dl', {},
-        row('Name', r.name), row('Company', r.company),
-        row('Email', el('a', { href: `mailto:${encodeURIComponent(r.email).replace(/%40/, '@')}?subject=${encodeURIComponent(`Backline request ${r.ref}`)}` }, r.email)),
-        row('Phone', el('a', { href: `tel:${r.phone.replace(/[^\d+]/g, '')}` }, r.phone))),
-      el('h3', {}, 'Show'),
-      el('dl', {},
-        row('Dates', span(r.start_date, r.end_date)), row('Artist', r.artist), row('Venue', r.venue),
-        row('City', r.city_state), row('Getting gear', r.delivery)),
-      r.notes ? [el('h3', {}, 'Notes'), el('p', { class: 'pre' }, r.notes)] : null,
-      el('h3', {}, 'Gear'),
-      r.items.length ? el('table', { class: 'pick' },
-        el('thead', {}, el('tr', {}, el('th', {}, 'Qty'), el('th', {}, 'Item'), el('th', {}, 'Make or size'))),
-        el('tbody', {}, r.items.map((i) => el('tr', {}, el('td', {}, String(i.qty)), el('td', {}, i.gear, i.category === 'Custom request' ? el('span', { class: 'tag' }, 'Custom') : null), el('td', {}, i.spec))))) : null,
+    // The follow-up block sits outside main, so editing never touches unsaved private notes.
+    const main = el('div', { id: 'detail-main' });
+    renderRead(main, r);
+    $('detail').replaceChildren(
+      main,
       el('h3', {}, 'Your follow-up'),
       el('div', { class: 'field' }, el('label', { htmlFor: 'status' }, 'Status'), status),
       el('div', { class: 'field' }, el('label', { htmlFor: 'internal' }, 'Private notes'), notes),
-      el('div', { class: 'save-row' }, save, saved),
-    ].flat().filter(Boolean));
+      el('div', { class: 'save-row' }, save, saved));
     $('detail').hidden = false;
     if (window.matchMedia('(max-width: 860px)').matches) $('detail').scrollIntoView();
   }

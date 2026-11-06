@@ -169,6 +169,17 @@ textarea { resize: vertical; display: block; }
 @media (min-width: 861px) { #add-form { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; } }
 @media (max-width: 860px) { .prod-layout { grid-template-columns: 1fr; } #add-form { scroll-margin-top: 12px; } }
 
+/* Editing a request */
+.head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.original { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 12px; }
+.original summary { cursor: pointer; font-weight: 600; color: var(--go-dark); }
+.edit-item { display: grid; grid-template-columns: minmax(0, 1fr) 76px 38px; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.edit-item .spec { grid-column: 1 / -1; }
+.edit-item .x { width: 38px; height: 38px; }
+.edit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }
+.edit-actions .btn { margin: 0; }
+.add-line { margin-top: 10px; }
+
 /* Request inbox */
 .signin { max-width: 380px; margin: 56px auto; padding: 0 16px; }
 .signin .btn { width: 100%; margin-top: 18px; }

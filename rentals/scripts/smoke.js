@@ -76,6 +76,42 @@ const post = (url, body, headers) => fetch(base + url, { method: 'POST', headers
     const customFull = await (await fetch(`${base}/api/admin/requests/${custom.id}`, { headers: { cookie } })).json();
     assert.deepEqual(customFull.items[0], { gear: 'A theremin', category: 'Custom request', qty: 2, spec: 'Moog' });
 
+    // Editing request details
+    const detailsPut = (id, body, headers = { cookie }) => fetch(`${base}/api/admin/requests/${id}/details`, { method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const fetchReq = async (id) => (await fetch(`${base}/api/admin/requests/${id}`, { headers: { cookie } })).json();
+    const { name, company, email, phone, event_name, venue, city_state, start_date, end_date, artist, delivery, notes } = customFull;
+    const fields = { name, company, email, phone, event_name, venue, city_state, start_date, end_date, artist, delivery, notes };
+    const asSent = [{ gear: 'A theremin', qty: 2, spec: 'Moog' }];
+    assert.equal((await detailsPut(custom.id, { ...fields, items: asSent }, {})).status, 401, 'editing a request needs a login');
+    assert.equal((await detailsPut(99999, { ...fields, items: asSent })).status, 404);
+    out = await (await detailsPut(custom.id, { ...fields, items: asSent })).json();
+    assert.equal(out.changed, false, 'saving with no changes is a no-op');
+    let saved = await fetchReq(custom.id);
+    assert.equal(saved.original, null, 'no original saved by a no-op');
+    assert.equal(saved.edited_at, null);
+    r = await detailsPut(custom.id, { ...fields, email: 'nope', end_date: '2020-01-01', items: asSent });
+    out = await r.json();
+    assert.equal(r.status, 400);
+    assert(out.fields.email && out.fields.end_date, 'edit returns field errors');
+    assert.equal((await detailsPut(custom.id, { ...fields, items: [] })).status, 400, 'needs an item');
+    assert.equal((await detailsPut(custom.id, { ...fields, items: [{ gear: 'x', qty: 0 }] })).status, 400, 'bad quantity');
+    assert.equal((await fetchReq(custom.id)).original, null, 'refused edits change nothing');
+    r = await detailsPut(custom.id, {
+      ...fields, event_name: 'Edited Fair', start_date: '2020-01-01', end_date: '2020-01-02',
+      items: [{ gear: 'A theremin', qty: 3, spec: 'Moog' }, { gear: 'drum KIT', qty: 1, spec: '' }, { gear: 'Wobble board', qty: 1, spec: '' }],
+    });
+    assert.equal(r.status, 200, 'past dates allowed for staff');
+    saved = await fetchReq(custom.id);
+    assert.equal(saved.event_name, 'Edited Fair');
+    assert.deepEqual(saved.items.map((i) => [i.gear, i.category, i.qty]), [['A theremin', 'Custom request', 3], ['Drum kit', 'Drums', 1], ['Wobble board', 'Custom request', 1]]);
+    assert.equal(saved.original.event_name, 'Test Fair', 'original kept');
+    assert.equal(saved.original.items[0].qty, 2);
+    assert(saved.edited_at);
+    assert.equal(saved.status, 'New', 'status untouched by a details edit');
+    await detailsPut(custom.id, { ...fields, event_name: 'Edited Again', items: asSent });
+    saved = await fetchReq(custom.id);
+    assert.equal(saved.original.event_name, 'Test Fair', 'second edit keeps the first original');
+
     // Products
     const authed = (body) => ({ method: 'POST', headers: { cookie, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     assert.equal((await post('/api/admin/products', { name: 'X', category: 'Drums' })).status, 401, 'adding needs a login');

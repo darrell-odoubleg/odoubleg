@@ -44,6 +44,11 @@ function get(id) {
   return r ? shape(r) : null;
 }
 
+function getByName(name) {
+  const r = db.prepare('SELECT * FROM products WHERE name = ? COLLATE NOCASE').get(String(name));
+  return r ? shape(r) : null;
+}
+
 // Checks the fields shared by add and edit. Returns { fields }, or { error, status }.
 function clean(body, ownId) {
   const b = body && typeof body === 'object' ? body : {};
@@ -94,4 +99,4 @@ function update(id, body) {
 
 const remove = (id) => db.prepare('DELETE FROM products WHERE id = ?').run(String(id)).changes;
 
-module.exports = { catalog, get, add, update, remove };
+module.exports = { catalog, get, getByName, add, update, remove };

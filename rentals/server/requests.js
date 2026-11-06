@@ -18,9 +18,8 @@ function validDate(s) {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
-// Returns { errors } keyed by field, or { value } ready to save.
-function validate(body) {
-  const b = body && typeof body === 'object' ? body : {};
+// Checks everything except the gear. Returns { errors, value }.
+function validateFields(b, { allowPast = false } = {}) {
   const errors = {};
   const value = {
     name: oneLine(b.name, 120),
@@ -47,10 +46,17 @@ function validate(body) {
   // Yesterday is the cutoff so a requester a time zone behind the server isn't refused.
   const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
   if (!validDate(value.start_date)) errors.start_date = 'Enter the first day you need the gear.';
-  else if (value.start_date < yesterday) errors.start_date = 'This date has already passed.';
+  else if (!allowPast && value.start_date < yesterday) errors.start_date = 'This date has already passed.';
   if (!validDate(value.end_date)) errors.end_date = 'Enter the last day you need the gear.';
   else if (!errors.start_date && value.end_date < value.start_date) errors.end_date = 'This can\'t be before the first day.';
 
+  return { errors, value };
+}
+
+// Returns { errors } keyed by field, or { value, items } ready to save.
+function validate(body) {
+  const b = body && typeof body === 'object' ? body : {};
+  const { errors, value } = validateFields(b);
   const lines = Array.isArray(b.items) ? b.items : [];
   const items = [];
   const seen = new Set();
@@ -105,6 +111,7 @@ function getRequest(id) {
   const r = db.prepare('SELECT * FROM requests WHERE id = ?').get(id);
   if (!r) return null;
   r.items = db.prepare('SELECT gear, category, qty, spec FROM request_items WHERE request_id = ? ORDER BY id').all(id);
+  r.original = r.original ? JSON.parse(r.original) : null;
   return r;
 }
 
@@ -113,4 +120,51 @@ function updateRequest(id, { status, internal_notes }) {
     .run(status, text(internal_notes, 5000), id).changes;
 }
 
-module.exports = { STATUSES, CUSTOM, validate, saveRequest, listRequests, getRequest, updateRequest };
+const DETAIL_FIELDS = ['name', 'company', 'email', 'phone', 'event_name', 'venue', 'city_state', 'start_date', 'end_date', 'artist', 'delivery', 'notes'];
+const snapshot = (r) => ({ ...Object.fromEntries(DETAIL_FIELDS.map((f) => [f, r[f]])), items: r.items });
+
+// Staff edits. Past dates are allowed, since an old request may need correcting. An item
+// may no longer be on the product list, so names are free text: an item already on the
+// request keeps its category, one matching a product takes that product's name and
+// category, and anything else counts as custom.
+function editRequest(id, body) {
+  const current = getRequest(id);
+  if (!current) return { status: 404, error: 'Request not found' };
+  const b = body && typeof body === 'object' ? body : {};
+  const { errors, value } = validateFields(b, { allowPast: true });
+
+  const lines = Array.isArray(b.items) ? b.items : [];
+  const items = [];
+  let badLine = lines.length > MAX_LINES;
+  for (const line of lines.slice(0, MAX_LINES)) {
+    const gear = oneLine(line && line.gear, 200);
+    const qty = Number(line && line.qty);
+    if (!gear || !Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) { badLine = true; continue; }
+    const spec = oneLine(line.spec, 500);
+    const already = current.items.find((i) => i.gear === gear);
+    const product = already ? null : products.getByName(gear);
+    if (already) items.push({ gear, category: already.category, qty, spec });
+    else if (product) items.push({ gear: product.name, category: product.category, qty, spec });
+    else items.push({ gear, category: CUSTOM, qty, spec });
+  }
+  if (badLine) errors.items = `Each item needs a name and a quantity from 1 to ${MAX_QTY}.`;
+  else if (!items.length) errors.items = 'A request needs at least one item.';
+  if (Object.keys(errors).length) return { status: 400, error: 'Please fix the highlighted fields.', fields: errors };
+
+  const before = snapshot(current);
+  const after = { ...value, items };
+  if (JSON.stringify(before) === JSON.stringify(snapshot(after))) return { ok: true, changed: false };
+
+  db.transaction(() => {
+    const original = current.original ? JSON.stringify(current.original) : JSON.stringify(before);
+    db.prepare(`UPDATE requests SET name = @name, company = @company, email = @email, phone = @phone,
+        event_name = @event_name, venue = @venue, city_state = @city_state, start_date = @start_date,
+        end_date = @end_date, artist = @artist, delivery = @delivery, notes = @notes, original = @original,
+        edited_at = datetime('now'), updated_at = datetime('now') WHERE id = @id`).run({ ...value, original, id });
+    db.prepare('DELETE FROM request_items WHERE request_id = ?').run(id);
+    for (const i of items) insertItem.run(id, i.gear, i.category, i.qty, i.spec);
+  })();
+  return { ok: true, changed: true };
+}
+
+module.exports = { STATUSES, CUSTOM, validate, saveRequest, listRequests, getRequest, updateRequest, editRequest };
