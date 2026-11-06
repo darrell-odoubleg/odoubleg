@@ -1,5 +1,6 @@
 // node scripts/build-catalog.js "<Rider Backline Gear List.xlsx>"
-// Rebuilds data/catalog.json from the workbook's Gear Totals tab. The catalog is
+// Rebuilds data/catalog.json from the workbook's Gear Totals tab. That file only
+// seeds a brand-new database; the live list is edited on the admin page. It is
 // public, so it holds only gear names, categories and makes: never act names,
 // act counts or anything else from a rider.
 const fs = require('fs');

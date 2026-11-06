@@ -89,8 +89,7 @@
       el('h3', {}, 'Gear'),
       r.items.length ? el('table', { class: 'pick' },
         el('thead', {}, el('tr', {}, el('th', {}, 'Qty'), el('th', {}, 'Item'), el('th', {}, 'Make or size'))),
-        el('tbody', {}, r.items.map((i) => el('tr', {}, el('td', {}, String(i.qty)), el('td', {}, i.gear), el('td', {}, i.spec))))) : null,
-      r.other_gear ? [el('h3', {}, 'Anything else'), el('p', { class: 'pre' }, r.other_gear)] : null,
+        el('tbody', {}, r.items.map((i) => el('tr', {}, el('td', {}, String(i.qty)), el('td', {}, i.gear, i.category === 'Custom request' ? el('span', { class: 'tag' }, 'Custom') : null), el('td', {}, i.spec))))) : null,
       el('h3', {}, 'Your follow-up'),
       el('div', { class: 'field' }, el('label', { htmlFor: 'status' }, 'Status'), status),
       el('div', { class: 'field' }, el('label', { htmlFor: 'internal' }, 'Private notes'), notes),
@@ -100,10 +99,98 @@
     if (window.matchMedia('(max-width: 860px)').matches) $('detail').scrollIntoView();
   }
 
+  // Products --------------------------------------------------------------------
+  const NEW_CATEGORY = '__new';
+  let catalog = { categories: [], items: [] };
+
+  function renderProducts() {
+    const words = $('prod-search').value.toLowerCase().split(/\s+/).filter(Boolean);
+    const match = (i) => words.every((w) => `${i.name} ${i.category} ${i.makes.join(' ')}`.toLowerCase().includes(w));
+    $('prod-count').textContent = `${catalog.items.length} on the rentals page`;
+    const groups = catalog.categories.map((cat) => {
+      const rows = catalog.items.filter((i) => i.category === cat && match(i));
+      if (!rows.length) return null;
+      return el('section', { class: 'prod-group' }, el('h2', {}, cat), el('ul', {}, rows.map((i) => el('li', {},
+        el('div', {}, el('span', { class: 'gear-name' }, i.name), i.makes.length ? el('span', { class: 'gear-makes' }, i.makes.join(' · ')) : null),
+        el('button', { type: 'button', class: 'btn-del', 'aria-label': `Delete ${i.name}`, onclick: () => del(i) }, 'Delete')))));
+    }).filter(Boolean);
+    $('prod-list').replaceChildren(...(groups.length ? groups : [el('p', { class: 'state' }, 'No products match.')]));
+  }
+
+  function renderCategories() {
+    const sel = $('add-category');
+    const keep = sel.value;
+    sel.replaceChildren(...catalog.categories.map((c) => el('option', { value: c }, c)), el('option', { value: NEW_CATEGORY }, 'New category…'));
+    if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+    $('add-new-wrap').hidden = sel.value !== NEW_CATEGORY;
+  }
+
+  async function loadProducts() {
+    catalog = await api('/api/catalog');
+    renderCategories();
+    renderProducts();
+  }
+
+  async function del(item) {
+    if (!window.confirm(`Delete "${item.name}"? Customers won't see it anymore. Past requests keep it.`)) return;
+    $('prod-msg').hidden = true;
+    try {
+      await api(`/api/admin/products/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+    } catch (e) {
+      $('prod-msg').textContent = e.message;
+      $('prod-msg').hidden = false;
+    }
+    await loadProducts().catch(() => {});
+    $('prod-search').focus();
+  }
+
+  $('add-category').addEventListener('change', () => {
+    $('add-new-wrap').hidden = $('add-category').value !== NEW_CATEGORY;
+    if (!$('add-new-wrap').hidden) $('add-new').focus();
+  });
+  $('prod-search').addEventListener('input', renderProducts);
+  $('add-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const isNew = $('add-category').value === NEW_CATEGORY;
+    $('add-err').hidden = true;
+    $('add-ok').textContent = '';
+    try {
+      const p = await api('/api/admin/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: $('add-name').value, category: isNew ? $('add-new').value : $('add-category').value, makes: $('add-makes').value }),
+      });
+      $('add-name').value = '';
+      $('add-makes').value = '';
+      $('add-new').value = '';
+      await loadProducts();
+      $('add-category').value = p.category;
+      $('add-new-wrap').hidden = true;
+      $('add-ok').textContent = `Added "${p.name}" under ${p.category}.`;
+      $('add-name').focus();
+    } catch (err) {
+      $('add-err').textContent = err.message;
+      $('add-err').hidden = false;
+    }
+  });
+
+  function showTab() {
+    const products = location.hash === '#products';
+    $('view-requests').hidden = products;
+    $('view-products').hidden = !products;
+    $('tab-requests').setAttribute('aria-pressed', String(!products));
+    $('tab-products').setAttribute('aria-pressed', String(products));
+    if (products) loadProducts().catch((e) => { $('prod-msg').textContent = e.message; $('prod-msg').hidden = false; });
+    else load().catch((e) => { $('state').textContent = e.message; });
+  }
+  $('tab-requests').addEventListener('click', () => { history.replaceState(null, '', '#requests'); showTab(); });
+  $('tab-products').addEventListener('click', () => { history.replaceState(null, '', '#products'); showTab(); });
+  window.addEventListener('hashchange', showTab);
+
   $('filter').addEventListener('change', renderList);
   $('logout').addEventListener('click', async () => {
     await fetch('/api/logout', { method: 'POST' }).catch(() => {});
     location.href = '/login.html';
   });
-  load().catch((e) => { $('state').textContent = e.message; });
+  showTab();
 })();

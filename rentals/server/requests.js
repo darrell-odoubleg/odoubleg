@@ -1,13 +1,13 @@
 // Public request intake and the private inbox queries.
 const crypto = require('crypto');
 const db = require('./db');
-const catalog = require('../data/catalog.json');
+const products = require('./products');
 
 const STATUSES = ['New', 'Quoted', 'Booked', 'Declined', 'Closed'];
 const DELIVERY = ['Deliver to venue', 'Pick up', 'Not sure yet'];
 const MAX_LINES = 150;
 const MAX_QTY = 99;
-const byId = new Map(catalog.items.map((i) => [i.id, i]));
+const CUSTOM = 'Custom request';
 
 const text = (v, max) => String(v == null ? '' : v).replace(/\r\n/g, '\n').trim().slice(0, max);
 const oneLine = (v, max) => text(v, max).replace(/\s+/g, ' ');
@@ -34,7 +34,6 @@ function validate(body) {
     end_date: oneLine(b.end_date, 10),
     artist: oneLine(b.artist, 160),
     delivery: oneLine(b.delivery, 40),
-    other_gear: text(b.other_gear, 3000),
     notes: text(b.notes, 3000),
   };
 
@@ -57,21 +56,28 @@ function validate(body) {
   const seen = new Set();
   let badLine = lines.length > MAX_LINES;
   for (const line of lines.slice(0, MAX_LINES)) {
-    const gear = line && byId.get(line.id);
     const qty = Number(line && line.qty);
-    if (!gear || seen.has(gear.id) || !Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) { badLine = true; continue; }
+    if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) { badLine = true; continue; }
+    if (line.custom) {
+      const name = oneLine(line.name, 200);
+      if (!name) { badLine = true; continue; }
+      items.push({ gear: name, category: CUSTOM, qty, spec: oneLine(line.spec, 500) });
+      continue;
+    }
+    const gear = products.get(line.id);
+    if (!gear || seen.has(gear.id)) { badLine = true; continue; }
     seen.add(gear.id);
     items.push({ gear: gear.name, category: gear.category, qty, spec: oneLine(line.spec, 200) });
   }
   if (badLine) errors.items = 'Something in your gear list wasn\'t recognized. Reload the page and try again.';
-  else if (!items.length && !value.other_gear) errors.items = 'Add at least one item, or describe what you need under "Anything else".';
+  else if (!items.length) errors.items = 'Add at least one item or a custom request.';
 
   return Object.keys(errors).length ? { errors } : { value, items };
 }
 
 const insertRequest = db.prepare(`INSERT INTO requests
-  (ref, name, company, email, phone, event_name, venue, city_state, start_date, end_date, artist, delivery, other_gear, notes)
-  VALUES (@ref, @name, @company, @email, @phone, @event_name, @venue, @city_state, @start_date, @end_date, @artist, @delivery, @other_gear, @notes)`);
+  (ref, name, company, email, phone, event_name, venue, city_state, start_date, end_date, artist, delivery, notes)
+  VALUES (@ref, @name, @company, @email, @phone, @event_name, @venue, @city_state, @start_date, @end_date, @artist, @delivery, @notes)`);
 const insertItem = db.prepare('INSERT INTO request_items (request_id, gear, category, qty, spec) VALUES (?, ?, ?, ?, ?)');
 
 const REF_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -107,4 +113,4 @@ function updateRequest(id, { status, internal_notes }) {
     .run(status, text(internal_notes, 5000), id).changes;
 }
 
-module.exports = { STATUSES, catalog, validate, saveRequest, listRequests, getRequest, updateRequest };
+module.exports = { STATUSES, CUSTOM, validate, saveRequest, listRequests, getRequest, updateRequest };

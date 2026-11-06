@@ -4,6 +4,7 @@ const express = require('express');
 const session = require('express-session');
 const auth = require('./auth');
 const rq = require('./requests');
+const products = require('./products');
 const { sendAlert } = require('./notify');
 
 const PORT = Number(process.env.PORT) || 4800;
@@ -33,7 +34,7 @@ app.use(session({
 }));
 
 // Public ---------------------------------------------------------------------
-app.get('/api/catalog', (req, res) => res.json(rq.catalog));
+app.get('/api/catalog', (req, res) => res.json(products.catalog()));
 
 const SUBMIT_LIMIT = 6;
 const SUBMIT_WINDOW_MS = 60 * 60 * 1000;
@@ -82,6 +83,16 @@ app.put('/api/admin/requests/:id', auth.requireAuth, (req, res) => {
   const { status, internal_notes } = req.body || {};
   if (!rq.STATUSES.includes(status)) return res.status(400).json({ error: 'Unknown status' });
   if (!rq.updateRequest(Number(req.params.id), { status, internal_notes })) return res.status(404).json({ error: 'Request not found' });
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/products', auth.requireAuth, (req, res) => {
+  const { product, error, status } = products.add(req.body);
+  if (error) return res.status(status).json({ error });
+  res.status(201).json(product);
+});
+app.delete('/api/admin/products/:id', auth.requireAuth, (req, res) => {
+  if (!products.remove(req.params.id)) return res.status(404).json({ error: 'That product is already gone.' });
   res.json({ ok: true });
 });
 

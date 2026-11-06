@@ -21,6 +21,7 @@
     <div class="intro">
       <h1>What does your show need?</h1>
       <p>Add the gear to your request and send it over. We'll get back to you with availability and price. Nothing is booked until we confirm.</p>
+      <p class="intro-custom">Don't see what you need? <button id="custom-link" class="text-btn" type="button">Make a custom request</button></p>
     </div>
     <div class="layout">
       <div class="catalog">
@@ -33,9 +34,24 @@
         <div id="groups"></div>
         <div id="no-match" class="state" hidden>
           <p>Nothing matches that search.</p>
-          <p>You can describe it under "Anything else" when you review your request.</p>
-          <button id="no-match-go" class="btn btn-quiet" type="button">Review request</button>
+          <p>You can ask for it with a custom request below.</p>
         </div>
+        <section id="custom" class="custom" aria-labelledby="custom-h">
+          <h2 id="custom-h">Custom request</h2>
+          <p>Need something that isn't listed, or a specific setup? Tell us what you're after and we'll see what we can do.</p>
+          <form id="custom-form" novalidate>
+            <div class="field"><label for="custom-name">What do you need? <b>*</b></label><input id="custom-name" maxlength="200" autocomplete="off"></div>
+            <div class="custom-row">
+              <div class="field"><label for="custom-details">Make, model, size or other details</label><input id="custom-details" maxlength="500" autocomplete="off"></div>
+              <div class="field custom-qty"><label for="custom-qty">Quantity</label><input id="custom-qty" type="number" min="1" max="99" value="1" inputmode="numeric"></div>
+            </div>
+            <p id="custom-err" class="err" role="alert" hidden></p>
+            <div class="custom-actions">
+              <button class="btn btn-quiet" type="submit">Add to request</button>
+              <span id="custom-ok" class="muted" role="status"></span>
+            </div>
+          </form>
+        </section>
       </div>
       <aside class="sheet" aria-label="Your request">
         <h2>Your request</h2>
@@ -57,12 +73,10 @@
     <form id="form" novalidate>
       <fieldset>
         <legend>Gear</legend>
-        <p id="items-empty" class="muted" hidden>No gear added yet. <a href="#">Browse the gear list</a> or describe what you need below.</p>
+        <p id="items-empty" class="muted" hidden>No gear added yet. <a href="#">Browse the gear list</a> or <a href="#custom">make a custom request</a>.</p>
         <ul id="items" class="items"></ul>
-        <p id="err-items" class="err" hidden></p>
-        <label for="other_gear">Anything else?</label>
-        <p class="hint">Gear that isn't on the list, or a full rider requirement.</p>
-        <textarea id="other_gear" name="other_gear" rows="3" maxlength="3000"></textarea>
+        <p id="err-items" class="err" tabindex="-1" hidden></p>
+        <p class="add-custom">Need something that isn't listed? <a href="#custom">Add a custom request</a></p>
       </fieldset>
 
       <fieldset>

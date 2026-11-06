@@ -4,25 +4,54 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Requests | O Double G Rentals</title>
+<title>Admin | O Double G Rentals</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <header class="masthead"><div class="wrap masthead-in admin-top">
-  <a class="brand" href="/admin">O Double G <span>Requests</span></a>
+  <a class="brand" href="/admin">O Double G <span>Admin</span></a>
   <button id="logout" class="link-btn" type="button">Sign out</button>
 </div></header>
 <main class="wrap">
-  <div class="admin-head">
-    <h1>Requests</h1>
-    <div><label class="sr" for="filter">Show status</label><select id="filter"></select></div>
+  <div class="tabs">
+    <button id="tab-requests" class="tab" type="button" aria-pressed="true">Requests</button>
+    <button id="tab-products" class="tab" type="button" aria-pressed="false">Products</button>
   </div>
-  <p id="state" class="state" role="status">Loading…</p>
-  <div class="inbox">
-    <ul id="list" class="req-list"></ul>
-    <div id="detail" class="detail" hidden></div>
-  </div>
+
+  <section id="view-requests">
+    <div class="admin-head">
+      <h1>Requests</h1>
+      <div><label class="sr" for="filter">Show status</label><select id="filter"></select></div>
+    </div>
+    <p id="state" class="state" role="status">Loading…</p>
+    <div class="inbox">
+      <ul id="list" class="req-list"></ul>
+      <div id="detail" class="detail" hidden></div>
+    </div>
+  </section>
+
+  <section id="view-products" hidden>
+    <div class="admin-head"><h1>Products</h1><span id="prod-count" class="muted"></span></div>
+    <div class="prod-layout">
+      <form id="add-form" class="detail" novalidate>
+        <h2>Add a product</h2>
+        <div class="field"><label for="add-name">Product name</label><input id="add-name" maxlength="100" autocomplete="off"></div>
+        <div class="field"><label for="add-category">Category</label><select id="add-category"></select></div>
+        <div class="field" id="add-new-wrap" hidden><label for="add-new">New category name</label><input id="add-new" maxlength="60" autocomplete="off"></div>
+        <div class="field"><label for="add-makes">Makes (optional)</label><p class="hint">Separate with commas, like DW, Yamaha.</p><input id="add-makes" autocomplete="off"></div>
+        <p id="add-err" class="err" role="alert" hidden></p>
+        <button class="btn btn-go" type="submit">Add product</button>
+        <p id="add-ok" class="muted" role="status"></p>
+      </form>
+      <div>
+        <label class="sr" for="prod-search">Search products</label>
+        <input id="prod-search" type="search" placeholder="Search products" autocomplete="off">
+        <p id="prod-msg" class="err" role="alert" hidden></p>
+        <div id="prod-list"></div>
+      </div>
+    </div>
+  </section>
 </main>
 <script src="/admin.js"></script>
 </body>

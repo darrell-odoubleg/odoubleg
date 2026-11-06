@@ -2,7 +2,7 @@
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const assert = require('assert');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rentals-smoke-'));
@@ -42,8 +42,12 @@ const post = (url, body, headers) => fetch(base + url, { method: 'POST', headers
     assert.equal(r.status, 201);
     assert(/^R-[A-Z2-9]{6}$/.test(out.ref));
 
-    r = await post('/api/requests', { ...good, items: [], other_gear: 'A theremin' });
-    assert.equal(r.status, 201, 'free-text only request accepted');
+    r = await post('/api/requests', { ...good, items: [] });
+    assert.equal(r.status, 400, 'empty request refused');
+    r = await post('/api/requests', { ...good, items: [{ custom: true, name: '   ', qty: 1 }] });
+    assert.equal(r.status, 400, 'blank custom request refused');
+    r = await post('/api/requests', { ...good, items: [{ custom: true, name: 'A theremin', qty: 2, spec: 'Moog' }] });
+    assert.equal(r.status, 201, 'custom-only request accepted');
 
     r = await post('/api/requests', { ...good, website: 'http://spam.example' });
     assert.equal((await r.json()).ref, 'R-RECEIVED', 'honeypot looks like success');
@@ -68,8 +72,40 @@ const post = (url, body, headers) => fetch(base + url, { method: 'POST', headers
     r = await fetch(`${base}/api/admin/requests/${one.id}`, { method: 'PUT', headers: { cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Bogus' }) });
     assert.equal(r.status, 400);
 
-    // Rate limit: 2 saved already, limit is 6 per hour.
-    for (let i = 0; i < 4; i++) assert.equal((await post('/api/requests', good)).status, 201);
+    const custom = list.requests.find((x) => x.item_count === 2);
+    const customFull = await (await fetch(`${base}/api/admin/requests/${custom.id}`, { headers: { cookie } })).json();
+    assert.deepEqual(customFull.items[0], { gear: 'A theremin', category: 'Custom request', qty: 2, spec: 'Moog' });
+
+    // Products
+    const authed = (body) => ({ method: 'POST', headers: { cookie, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await post('/api/admin/products', { name: 'X', category: 'Drums' })).status, 401, 'adding needs a login');
+    assert.equal((await fetch(`${base}/api/admin/products/drum-kit`, { method: 'DELETE' })).status, 401, 'deleting needs a login');
+    assert.equal((await fetch(`${base}/api/admin/products`, authed({ name: '', category: 'Drums' }))).status, 400);
+    assert.equal((await fetch(`${base}/api/admin/products`, authed({ name: 'drum KIT', category: 'Drums' }))).status, 409, 'duplicate refused');
+    r = await fetch(`${base}/api/admin/products`, authed({ name: 'Test Gizmo', category: 'drums', makes: 'Acme, Acme, Zed' }));
+    assert.equal(r.status, 201);
+    const gizmo = await r.json();
+    assert.deepEqual([gizmo.category, gizmo.makes], ['Drums', ['Acme', 'Zed']], 'joins existing category, makes deduped');
+    const after = await (await fetch(`${base}/api/catalog`)).json();
+    assert(after.items.some((i) => i.id === gizmo.id), 'new product is public');
+    assert.equal(after.categories.filter((c) => c.toLowerCase() === 'drums').length, 1);
+    r = await post('/api/requests', { ...good, items: [{ id: gizmo.id, qty: 1 }] });
+    assert.equal(r.status, 201, 'new product can be requested');
+    const gizmoReq = (await (await fetch(`${base}/api/admin/requests`, { headers: { cookie } })).json()).requests[0];
+
+    assert.equal((await fetch(`${base}/api/admin/products/${gizmo.id}`, { method: 'DELETE', headers: { cookie } })).status, 200);
+    assert.equal((await fetch(`${base}/api/admin/products/${gizmo.id}`, { method: 'DELETE', headers: { cookie } })).status, 404);
+    assert.equal((await post('/api/requests', { ...good, items: [{ id: gizmo.id, qty: 1 }] })).status, 400, 'deleted product refused');
+    const kept = await (await fetch(`${base}/api/admin/requests/${gizmoReq.id}`, { headers: { cookie } })).json();
+    assert.equal(kept.items[0].gear, 'Test Gizmo', 'past request keeps a deleted product');
+
+    // A deleted seed product must not come back when the app restarts.
+    assert.equal((await fetch(`${base}/api/admin/products/snare-drum`, { method: 'DELETE', headers: { cookie } })).status, 200);
+    const reread = execFileSync('node', ['-e', "console.log(require('./server/products').get('snare-drum'))"], { cwd: path.join(__dirname, '..'), env }).toString().trim();
+    assert.equal(reread, 'null', 'deleted product stays deleted');
+
+    // Rate limit: 3 saved already, limit is 6 per hour.
+    for (let i = 0; i < 3; i++) assert.equal((await post('/api/requests', good)).status, 201);
     assert.equal((await post('/api/requests', good)).status, 429, 'rate limit applies');
     console.log('smoke ok');
   } finally {

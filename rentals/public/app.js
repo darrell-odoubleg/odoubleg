@@ -17,7 +17,7 @@
 
   let catalog = { categories: [], popular: [], items: [] };
   let byId = new Map();
-  let cart = {}; // id -> { qty, spec }
+  let cart = {}; // id -> { qty, spec }, plus { custom: true, name } for custom requests
   let activeChip = 'all';
   let lastRef = null;
 
@@ -28,11 +28,14 @@
     try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch { /* private window: cart lasts until reload */ }
   };
   const countAll = () => Object.values(cart).reduce((n, l) => n + l.qty, 0);
+  // A saved cart can hold a product that has since been deleted from the list.
+  const lineIds = () => Object.keys(cart).filter((id) => cart[id].custom || byId.has(id));
+  const lineName = (id) => (cart[id].custom ? cart[id].name : byId.get(id).name);
 
   // Quantity control -----------------------------------------------------------
   function setQty(id, qty, focus) {
     if (qty <= 0) delete cart[id];
-    else cart[id] = { qty: Math.min(qty, MAX_QTY), spec: (cart[id] && cart[id].spec) || '' };
+    else cart[id] = { spec: '', ...cart[id], qty: Math.min(qty, MAX_QTY) };
     saveCart();
     renderRowControl(id, focus);
     renderSheet();
@@ -83,22 +86,59 @@
     groups.querySelectorAll('section').forEach((s, i) => { s.dataset.cat = catalog.categories[i]; });
     catalog.items.forEach((i) => renderRowControl(i.id));
 
-    const chip = (key, label) => el('button', {
-      type: 'button', class: 'chip', 'aria-pressed': String(key === activeChip),
-      onclick: (e) => {
-        activeChip = key;
-        document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c === e.currentTarget)));
-        applyFilter();
-      },
-    }, label);
+    const chip = (key, label) => {
+      const b = el('button', { type: 'button', class: 'chip', 'aria-pressed': String(key === activeChip), onclick: () => setChip(key) }, label);
+      b.dataset.key = key;
+      return b;
+    };
     $('chips').replaceChildren(chip('all', 'All gear'), chip('popular', 'Most requested'),
-      ...catalog.categories.map((c) => chip(c, c)));
+      ...catalog.categories.map((c) => chip(c, c)), chip('custom', 'Custom request'));
+  }
+
+  function setChip(key) {
+    activeChip = key;
+    document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.key === key)));
+    applyFilter();
+  }
+
+  function showCustom() {
+    setChip('custom');
+    $('custom').scrollIntoView({ block: 'start' });
+    $('custom-name').focus({ preventScroll: true });
+  }
+
+  function addCustom(e) {
+    e.preventDefault();
+    const name = $('custom-name').value.trim();
+    const qty = Number($('custom-qty').value);
+    const err = $('custom-err');
+    $('custom-ok').textContent = '';
+    err.hidden = true;
+    if (!name) {
+      err.textContent = 'Tell us what you need.';
+      err.hidden = false;
+      $('custom-name').focus();
+      return;
+    }
+    if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) {
+      err.textContent = `Enter a quantity from 1 to ${MAX_QTY}.`;
+      err.hidden = false;
+      $('custom-qty').focus();
+      return;
+    }
+    cart[`custom-${Date.now()}`] = { custom: true, name, qty, spec: $('custom-details').value.trim() };
+    saveCart();
+    renderSheet();
+    $('custom-form').reset();
+    $('custom-ok').textContent = `Added "${name}" to your request.`;
+    $('custom-name').focus();
   }
 
   function applyFilter() {
     const words = $('search').value.toLowerCase().split(/\s+/).filter(Boolean);
     const popular = new Set(catalog.popular);
     let shown = 0;
+    $('custom').hidden = activeChip !== 'all' && activeChip !== 'custom';
     document.querySelectorAll('.group').forEach((group) => {
       let inGroup = 0;
       group.querySelectorAll('.gear').forEach((row) => {
@@ -110,18 +150,18 @@
       group.hidden = !inGroup;
       shown += inGroup;
     });
-    $('no-match').hidden = shown > 0;
+    $('no-match').hidden = shown > 0 || activeChip === 'custom';
   }
 
   // Sidebar and phone bar -------------------------------------------------------
   function renderSheet() {
-    const ids = Object.keys(cart).filter((id) => byId.has(id));
+    const ids = lineIds();
     $('sheet-empty').hidden = ids.length > 0;
     $('sheet-go').hidden = ids.length === 0;
     $('sheet-list').replaceChildren(...ids.map((id) => el('li', {},
       el('span', { class: 'qty' }, `${cart[id].qty} ×`),
-      el('span', { class: 'nm' }, byId.get(id).name),
-      el('button', { type: 'button', class: 'x', 'aria-label': `Remove ${byId.get(id).name}`, onclick: () => setQty(id, 0) }, '×'))));
+      el('span', { class: 'nm' }, lineName(id), cart[id].custom ? el('span', { class: 'tag' }, 'Custom') : null),
+      el('button', { type: 'button', class: 'x', 'aria-label': `Remove ${lineName(id)}`, onclick: () => setQty(id, 0) }, '×'))));
     const n = countAll();
     $('mobile-bar').hidden = n === 0;
     $('mobile-count').textContent = `${n} item${n === 1 ? '' : 's'}`;
@@ -129,29 +169,30 @@
 
   // Review ----------------------------------------------------------------------
   function renderItems() {
-    const ids = Object.keys(cart).filter((id) => byId.has(id));
+    const ids = lineIds();
     $('items-empty').hidden = ids.length > 0;
     // The list is rebuilt on every quantity change, so put focus back on the same button.
     const focused = document.activeElement && document.activeElement.getAttribute('aria-label');
     $('items').replaceChildren(...ids.map((id) => {
-      const item = byId.get(id);
       const line = cart[id];
+      const name = lineName(id);
+      const makes = line.custom ? [] : byId.get(id).makes;
       const listId = `makes-${id}`;
       const spec = el('input', {
-        type: 'text', class: 'spec', value: line.spec, maxLength: 200,
-        placeholder: 'Make, model or size (optional)', 'aria-label': `${item.name}: make, model or size`,
-        list: listId,
+        type: 'text', class: 'spec', value: line.spec, maxLength: line.custom ? 500 : 200,
+        placeholder: 'Make, model or size (optional)', 'aria-label': `${name}: make, model or size`,
+        ...(makes.length ? { list: listId } : {}),
       });
       spec.addEventListener('input', () => { line.spec = spec.value; saveCart(); });
       return el('li', { class: 'item' },
         el('div', { class: 'item-top' },
-          el('span', { class: 'gear-name' }, item.name),
+          el('span', { class: 'gear-name' }, name, line.custom ? el('span', { class: 'tag' }, 'Custom') : null),
           el('div', { class: 'stepper' },
-            el('button', { type: 'button', 'aria-label': `One fewer ${item.name}`, onclick: () => setQty(id, line.qty - 1) }, '−'),
+            el('button', { type: 'button', 'aria-label': `One fewer ${name}`, onclick: () => setQty(id, line.qty - 1) }, '−'),
             el('output', {}, String(line.qty)),
-            el('button', { type: 'button', 'aria-label': `One more ${item.name}`, disabled: line.qty >= MAX_QTY, onclick: () => setQty(id, line.qty + 1) }, '+'))),
+            el('button', { type: 'button', 'aria-label': `One more ${name}`, disabled: line.qty >= MAX_QTY, onclick: () => setQty(id, line.qty + 1) }, '+'))),
         spec,
-        item.makes.length ? el('datalist', { id: listId }, item.makes.map((m) => el('option', { value: m }))) : null);
+        makes.length ? el('datalist', { id: listId }, makes.map((m) => el('option', { value: m }))) : null);
     }));
     if (focused) {
       const again = [...$('items').querySelectorAll('[aria-label]')].find((n) => n.getAttribute('aria-label') === focused);
@@ -173,7 +214,7 @@
       if (name === 'items') {
         $('err-items').textContent = message;
         $('err-items').hidden = false;
-        targets.push($('other_gear'));
+        targets.push($('err-items'));
         return;
       }
       if (name === 'delivery') {
@@ -198,7 +239,10 @@
     const send = $('send');
     const form = $('form');
     const data = Object.fromEntries(new FormData(form).entries());
-    data.items = Object.entries(cart).filter(([id]) => byId.has(id)).map(([id, l]) => ({ id, qty: l.qty, spec: l.spec }));
+    data.items = lineIds().map((id) => {
+      const l = cart[id];
+      return l.custom ? { custom: true, name: l.name, qty: l.qty, spec: l.spec } : { id, qty: l.qty, spec: l.spec };
+    });
     send.disabled = true;
     send.textContent = 'Sending…';
     try {
@@ -239,13 +283,16 @@
       $('done-ref').textContent = lastRef;
       document.querySelector('#view-done h1').focus();
     }
-    window.scrollTo(0, 0);
+    if (hash === '#custom' && catalog.items.length) showCustom();
+    else window.scrollTo(0, 0);
   }
 
   async function start() {
     $('form').addEventListener('submit', submit);
-    $('search').addEventListener('input', applyFilter);
-    $('no-match-go').addEventListener('click', () => { location.hash = '#request'; });
+    $('search').addEventListener('input', () => { if (activeChip === 'custom') setChip('all'); else applyFilter(); });
+    $('custom-link').addEventListener('click', showCustom);
+    $('custom-form').addEventListener('submit', addCustom);
+    $('custom-form').addEventListener('input', () => { $('custom-err').hidden = true; $('custom-ok').textContent = ''; });
     window.addEventListener('hashchange', route);
     route();
     try {
@@ -258,7 +305,7 @@
     }
     byId = new Map(catalog.items.map((i) => [i.id, i]));
     const saved = loadCart();
-    cart = Object.fromEntries(Object.entries(saved).filter(([id, l]) => byId.has(id) && l && l.qty >= 1));
+    cart = Object.fromEntries(Object.entries(saved).filter(([id, l]) => l && l.qty >= 1 && (l.custom ? l.name : byId.has(id))));
     $('load-state').hidden = true;
     buildCatalog();
     renderSheet();
