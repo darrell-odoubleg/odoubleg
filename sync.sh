@@ -11,6 +11,7 @@ declare -A APPS=(
   [msf]=/var/www/msf-odoubleg
   [medreview]=/var/www/medreview-odoubleg
   [equifax]=/var/www/equifax-odoubleg
+  [rentals]=/var/www/rentals-odoubleg
 )
 for prefix in "${!APPS[@]}"; do
   src=${APPS[$prefix]}
