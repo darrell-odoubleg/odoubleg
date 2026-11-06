@@ -86,6 +86,11 @@ app.put('/api/admin/requests/:id', auth.requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+app.put('/api/admin/requests/:id/details', auth.requireAuth, (req, res) => {
+  const { status, ...out } = rq.editRequest(Number(req.params.id), req.body);
+  res.status(status || 200).json(out);
+});
+
 app.post('/api/admin/products', auth.requireAuth, (req, res) => {
   const { product, error, status } = products.add(req.body);
   if (error) return res.status(status).json({ error });

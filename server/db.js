@@ -48,4 +48,9 @@ CREATE TABLE IF NOT EXISTS request_items (
 CREATE INDEX IF NOT EXISTS idx_items_request ON request_items(request_id);
 `);
 
+// Added after launch: the customer's request as first sent, saved on the first edit.
+const columns = db.prepare('PRAGMA table_info(requests)').all().map((c) => c.name);
+if (!columns.includes('original')) db.exec('ALTER TABLE requests ADD COLUMN original TEXT');
+if (!columns.includes('edited_at')) db.exec('ALTER TABLE requests ADD COLUMN edited_at TEXT');
+
 module.exports = db;
