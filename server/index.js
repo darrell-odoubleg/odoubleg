@@ -91,6 +91,11 @@ app.post('/api/admin/products', auth.requireAuth, (req, res) => {
   if (error) return res.status(status).json({ error });
   res.status(201).json(product);
 });
+app.put('/api/admin/products/:id', auth.requireAuth, (req, res) => {
+  const { product, error, status } = products.update(req.params.id, req.body);
+  if (error) return res.status(status).json({ error });
+  res.json(product);
+});
 app.delete('/api/admin/products/:id', auth.requireAuth, (req, res) => {
   if (!products.remove(req.params.id)) return res.status(404).json({ error: 'That product is already gone.' });
   res.json({ ok: true });

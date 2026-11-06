@@ -101,7 +101,8 @@
 
   // Products --------------------------------------------------------------------
   const NEW_CATEGORY = '__new';
-  let catalog = { categories: [], items: [] };
+  let catalog = { categories: [], popular: [], items: [] };
+  let editing = null; // the product open in the form, or null when adding
 
   function renderProducts() {
     const words = $('prod-search').value.toLowerCase().split(/\s+/).filter(Boolean);
@@ -110,9 +111,11 @@
     const groups = catalog.categories.map((cat) => {
       const rows = catalog.items.filter((i) => i.category === cat && match(i));
       if (!rows.length) return null;
-      return el('section', { class: 'prod-group' }, el('h2', {}, cat), el('ul', {}, rows.map((i) => el('li', {},
+      return el('section', { class: 'prod-group' }, el('h2', {}, cat), el('ul', {}, rows.map((i) => el('li', { class: editing && editing.id === i.id ? 'editing' : '' },
         el('div', {}, el('span', { class: 'gear-name' }, i.name), i.makes.length ? el('span', { class: 'gear-makes' }, i.makes.join(' · ')) : null),
-        el('button', { type: 'button', class: 'btn-del', 'aria-label': `Delete ${i.name}`, onclick: () => del(i) }, 'Delete')))));
+        el('div', { class: 'prod-actions' },
+          el('button', { type: 'button', class: 'btn-edit', 'aria-label': `Edit ${i.name}`, onclick: () => startEdit(i) }, 'Edit'),
+          el('button', { type: 'button', class: 'btn-del', 'aria-label': `Delete ${i.name}`, onclick: () => del(i) }, 'Delete'))))));
     }).filter(Boolean);
     $('prod-list').replaceChildren(...(groups.length ? groups : [el('p', { class: 'state' }, 'No products match.')]));
   }
@@ -131,9 +134,40 @@
     renderProducts();
   }
 
+  function clearForm() {
+    editing = null;
+    $('form-title').textContent = 'Add a product';
+    $('add-submit').textContent = 'Add product';
+    $('add-cancel').hidden = true;
+    $('add-name').value = '';
+    $('add-makes').value = '';
+    $('add-new').value = '';
+    $('add-popular').checked = false;
+    $('add-err').hidden = true;
+  }
+
+  function startEdit(item) {
+    editing = item;
+    $('form-title').textContent = `Edit ${item.name}`;
+    $('add-submit').textContent = 'Save changes';
+    $('add-cancel').hidden = false;
+    $('add-name').value = item.name;
+    $('add-makes').value = item.makes.join(', ');
+    $('add-new').value = '';
+    $('add-category').value = item.category;
+    $('add-new-wrap').hidden = true;
+    $('add-popular').checked = catalog.popular.includes(item.id);
+    $('add-err').hidden = true;
+    $('add-ok').textContent = '';
+    renderProducts();
+    $('add-form').scrollIntoView({ block: 'nearest' });
+    $('add-name').focus();
+  }
+
   async function del(item) {
     if (!window.confirm(`Delete "${item.name}"? Customers won't see it anymore. Past requests keep it.`)) return;
     $('prod-msg').hidden = true;
+    if (editing && editing.id === item.id) clearForm();
     try {
       await api(`/api/admin/products/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
     } catch (e) {
@@ -149,24 +183,35 @@
     if (!$('add-new-wrap').hidden) $('add-new').focus();
   });
   $('prod-search').addEventListener('input', renderProducts);
+  $('add-cancel').addEventListener('click', () => {
+    const was = editing;
+    clearForm();
+    renderProducts();
+    const back = was && document.querySelector(`[aria-label="Edit ${CSS.escape(was.name)}"]`);
+    if (back) back.focus(); else $('add-name').focus();
+  });
   $('add-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const isNew = $('add-category').value === NEW_CATEGORY;
     $('add-err').hidden = true;
     $('add-ok').textContent = '';
     try {
-      const p = await api('/api/admin/products', {
-        method: 'POST',
+      const wasEditing = !!editing;
+      const p = await api(wasEditing ? `/api/admin/products/${encodeURIComponent(editing.id)}` : '/api/admin/products', {
+        method: wasEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: $('add-name').value, category: isNew ? $('add-new').value : $('add-category').value, makes: $('add-makes').value }),
+        body: JSON.stringify({
+          name: $('add-name').value,
+          category: isNew ? $('add-new').value : $('add-category').value,
+          makes: $('add-makes').value,
+          popular: $('add-popular').checked,
+        }),
       });
-      $('add-name').value = '';
-      $('add-makes').value = '';
-      $('add-new').value = '';
+      clearForm();
       await loadProducts();
       $('add-category').value = p.category;
       $('add-new-wrap').hidden = true;
-      $('add-ok').textContent = `Added "${p.name}" under ${p.category}.`;
+      $('add-ok').textContent = wasEditing ? `Saved "${p.name}" under ${p.category}.` : `Added "${p.name}" under ${p.category}.`;
       $('add-name').focus();
     } catch (err) {
       $('add-err').textContent = err.message;
