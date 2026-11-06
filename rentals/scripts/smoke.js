@@ -8,7 +8,7 @@ const assert = require('assert');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rentals-smoke-'));
 const PORT = 4899;
 const base = `http://127.0.0.1:${PORT}`;
-const env = { ...process.env, PORT, NODE_ENV: 'test', SESSION_SECRET: 'smoke', DB_PATH: path.join(dir, 't.db') };
+const env = { ...process.env, PORT, NODE_ENV: 'test', SESSION_SECRET: 'smoke', DB_PATH: path.join(dir, 't.db'), NOTIFY_TO: '' }; // no real alerts from tests
 
 const future = (d) => new Date(Date.now() + d * 864e5).toISOString().slice(0, 10);
 const good = {

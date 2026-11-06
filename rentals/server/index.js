@@ -4,6 +4,7 @@ const express = require('express');
 const session = require('express-session');
 const auth = require('./auth');
 const rq = require('./requests');
+const { sendAlert } = require('./notify');
 
 const PORT = Number(process.env.PORT) || 4800;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -61,6 +62,7 @@ app.post('/api/requests', (req, res) => {
   recent.push(Date.now());
   submits.set(req.ip, recent);
   res.status(201).json({ ok: true, ref });
+  sendAlert(ref, value, items).catch((e) => console.error(`Alert for ${ref} failed:`, e.message));
 });
 
 // Private inbox --------------------------------------------------------------
